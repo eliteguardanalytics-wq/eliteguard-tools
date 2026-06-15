@@ -1,7 +1,7 @@
 
 
-const SUPA_URL = 'YOUR_SUPABASE_URL';
-const SUPA_KEY = 'YOUR_SUPABASE_ANON_KEY';
+const SUPA_URL = 'https://blsnxyhnuckpvbkoixqa.supabase.co';
+const SUPA_KEY = 'sb_publishable_4_iqlW98eU6gtYI3uUku6Q_qARTbydT';
 const EG_DOMAIN = 'eliteguard.internal';
 
 let _db;
