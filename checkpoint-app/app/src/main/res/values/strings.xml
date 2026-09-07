@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Elite Guard Tours</string>
+
+    <!-- Login -->
+    <string name="login_title">Officer Sign In</string>
+    <string name="login_subtitle">Use the same username and password as the Elite Guard web tools.</string>
+    <string name="login_username">Username</string>
+    <string name="login_password">Password</string>
+    <string name="login_button">Sign In</string>
+    <string name="login_signing_in">Signing in…</string>
+    <string name="login_missing">Enter your username and password.</string>
+    <string name="login_invalid">Invalid username or password.</string>
+    <string name="login_no_profile">Account not found. Contact your administrator.</string>
+    <string name="login_network">Could not reach the server. Check your connection and try again.</string>
+
+    <!-- Sites -->
+    <string name="sites_title">Sites</string>
+    <string name="sites_empty">No sites yet. Pull down the refresh button once you are online.</string>
+    <string name="sites_loading">Refreshing sites and checkpoints…</string>
+    <string name="sites_refreshed">Sites and checkpoints updated.</string>
+    <string name="sites_offline">Offline – showing saved sites.</string>
+    <string name="sites_checkpoint_count">%1$d checkpoints</string>
+    <string name="sites_active_tour">Tour in progress at %1$s – tap to resume</string>
+    <string name="sites_pending_sync">%1$d items waiting to upload</string>
+    <string name="sites_all_synced">All tour logs uploaded</string>
+    <string name="menu_refresh">Refresh</string>
+    <string name="menu_history">Tour history</string>
+    <string name="menu_setup">Set up tags</string>
+    <string name="menu_logout">Sign out</string>
+    <string name="logout_confirm_title">Sign out?</string>
+    <string name="logout_confirm_pending">%1$d tour records have not uploaded yet. Signing out will keep them on this phone until you sign in again. Continue?</string>
+    <string name="logout_confirm">Sign out</string>
+    <string name="cancel">Cancel</string>
+    <string name="session_expired">Your session has expired. Please sign in again.</string>
+
+    <!-- Tour -->
+    <string name="tour_title">Tour</string>
+    <string name="tour_route_label">Route</string>
+    <string name="tour_all_checkpoints">All checkpoints</string>
+    <string name="tour_not_started">Tour not started</string>
+    <string name="tour_ready_hint">Press Start Tour, then hold the phone against each checkpoint tag.</string>
+    <string name="tour_in_progress">Started %1$s · %2$d of %3$d scanned</string>
+    <string name="tour_complete_banner">All checkpoints scanned – press End Tour to finish.</string>
+    <string name="tour_start">Start Tour</string>
+    <string name="tour_end">End Tour</string>
+    <string name="tour_no_checkpoints">No checkpoints are set up for this site yet.</string>
+    <string name="tour_scanned_at">Scanned %1$s</string>
+    <string name="tour_pending">Not scanned</string>
+    <string name="tour_scan_ok">%1$s scanned</string>
+    <string name="tour_scan_duplicate">%1$s was already scanned at %2$s</string>
+    <string name="tour_scan_unknown">Unknown tag. It is not registered as a checkpoint for this site.</string>
+    <string name="tour_scan_not_in_route">%1$s is not part of this route.</string>
+    <string name="tour_scan_not_started">Start the tour first, then tap the checkpoint tag.</string>
+    <string name="tour_end_title">End tour?</string>
+    <string name="tour_end_all_done">All %1$d checkpoints were scanned.</string>
+    <string name="tour_end_missing">%1$d of %2$d checkpoints scanned. Missed:\n%3$s</string>
+    <string name="tour_end_confirm">End Tour</string>
+    <string name="tour_ended">Tour ended. %1$d of %2$d checkpoints scanned.</string>
+    <string name="tour_sync_later">Saved on phone – will upload when online.</string>
+    <string name="nfc_missing">This phone does not have NFC, so checkpoints cannot be scanned.</string>
+    <string name="nfc_disabled">NFC is turned off. Turn it on to scan checkpoints.</string>
+    <string name="nfc_open_settings">Open NFC settings</string>
+
+    <!-- Setup -->
+    <string name="setup_title">Set Up Tags</string>
+    <string name="setup_hint">Select a checkpoint, then hold a blank NFC tag against the phone to link it.</string>
+    <string name="setup_selected_hint">Tap a tag now to link it to \"%1$s\".</string>
+    <string name="setup_add">Add checkpoint</string>
+    <string name="setup_add_title">New checkpoint</string>
+    <string name="setup_add_name">Checkpoint name (e.g. North Gate)</string>
+    <string name="setup_add_save">Save</string>
+    <string name="setup_add_missing">Enter a checkpoint name.</string>
+    <string name="setup_linked">Tag linked to %1$s.</string>
+    <string name="setup_linked_written">Tag linked to %1$s and written.</string>
+    <string name="setup_tag_taken">This tag is already linked to \"%1$s\".</string>
+    <string name="setup_tag_taken_other">This tag is already linked to another checkpoint.</string>
+    <string name="setup_no_selection">Select a checkpoint first, then tap the tag.</string>
+    <string name="setup_offline">You must be online to set up tags.</string>
+    <string name="setup_tag_uid">Tag %1$s</string>
+    <string name="setup_tag_none">No tag linked</string>
+    <string name="setup_replace_title">Replace tag?</string>
+    <string name="setup_replace_message">\"%1$s\" already has a tag linked. Link this new tag instead?</string>
+    <string name="setup_replace">Replace</string>
+    <string name="setup_rename">Rename</string>
+    <string name="setup_deactivate">Remove checkpoint</string>
+    <string name="setup_deactivate_message">Remove \"%1$s\" from this site? Past tour logs keep their records.</string>
+    <string name="setup_remove">Remove</string>
+    <string name="setup_saved">Saved.</string>
+
+    <!-- History -->
+    <string name="history_title">Tour History</string>
+    <string name="history_empty">No tours recorded on this phone yet.</string>
+    <string name="history_line">%1$s · %2$d of %3$d scanned</string>
+    <string name="history_status_in_progress">In progress</string>
+    <string name="history_status_completed">Completed</string>
+    <string name="history_status_incomplete">Incomplete</string>
+    <string name="history_uploaded">Uploaded</string>
+    <string name="history_not_uploaded">Waiting to upload</string>
+
+    <string name="error_generic">Something went wrong: %1$s</string>
+    <string name="offline_short">Offline</string>
+</resources>

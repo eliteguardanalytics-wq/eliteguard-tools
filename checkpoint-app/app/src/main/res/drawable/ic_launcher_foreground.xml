@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Shield -->
+    <path android:fillColor="#F2B233" android:pathData="M54,22 L78,31 V52 C78,66 68,77 54,84 C40,77 30,66 30,52 V31 Z"/>
+    <path android:fillColor="#0F2A44" android:pathData="M54,29 L72,36 V52 C72,63 64,72 54,78 C44,72 36,63 36,52 V36 Z"/>
+    <!-- Check mark -->
+    <path android:fillColor="#F2B233" android:pathData="M45,53 L51,59 L64,45 L67.5,48.5 L51,65 L41.5,56.5 Z"/>
+</vector>
