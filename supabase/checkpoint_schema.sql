@@ -1,19 +1,30 @@
 -- ============================================================================
--- Elite Guard Tours – checkpoint / tour schema for Supabase
+-- Elite Guard Tours – checkpoint / tour schema
 -- ----------------------------------------------------------------------------
--- Run this once in the Supabase SQL editor (Dashboard -> SQL Editor -> New query).
--- It is safe to re-run: every statement is idempotent.
+-- Target: the Elite Guard INCIDENT REPORTING Supabase project
+--         (https://fmfcfepwindmioiowvfe.supabase.co)
 --
--- Assumes the tables already used by the web tools exist:
---   public.properties (id uuid primary key, name text, ...)   -- client sites
---   public.profiles   (id uuid primary key = auth.users.id, username, display_name, role)
--- If your properties.id column is bigint instead of uuid, change the type of
--- every property_id column below to match.
+-- Run this once in that project: Dashboard -> SQL Editor -> New query -> Run.
+-- Every statement is idempotent, so it is safe to re-run.
+--
+-- It expects two tables that already exist in that project:
+--   public.properties                (uuid id, name)          -- the client sites
+--   public.incident_portal_accounts  (role, keyed to auth)    -- the portal logins
+--
+-- It ADDS: address and zone columns on properties, plus five new tables
+-- (checkpoints, tours, tour_checkpoints, tour_logs, tour_scans), their row level
+-- security policies, and a reporting view. Nothing existing is dropped or altered
+-- beyond the two new nullable columns on properties.
 -- ============================================================================
 
 create extension if not exists pgcrypto;
 
--- ---------------------------------------------------------------- helpers
+-- ---------------------------------------------------------------- 1. properties
+-- The app shows a site's address and zone under its name. Both are optional.
+alter table public.properties add column if not exists address text;
+alter table public.properties add column if not exists zone    text;
+
+-- ---------------------------------------------------------------- 2. helpers
 create or replace function public.set_updated_at()
 returns trigger language plpgsql as $$
 begin
@@ -21,21 +32,51 @@ begin
   return new;
 end $$;
 
--- True when the signed-in user may manage checkpoints and routes.
-create or replace function public.is_tour_manager()
-returns boolean
-language sql stable security definer
-set search_path = public
-as $$
-  select exists (
-    select 1 from public.profiles
-    where id = auth.uid() and role in ('admin', 'supervisor', 'manager')
-  );
-$$;
+-- True when the signed-in account may manage checkpoints and enrol NFC tags.
+--
+-- The accounts table is keyed to Supabase Auth by one of id / user_id / auth_user_id.
+-- This block finds which one and builds the function around it, so the function is
+-- static (and fast) afterwards. To change who may enrol tags, edit the role list on
+-- the marked line below and re-run this block.
+do $do$
+declare
+  key_col text;
+begin
+  select c.column_name into key_col
+  from information_schema.columns c
+  where c.table_schema = 'public'
+    and c.table_name   = 'incident_portal_accounts'
+    and c.column_name in ('id', 'user_id', 'auth_user_id')
+    and c.data_type    = 'uuid'
+  order by array_position(array['id', 'user_id', 'auth_user_id'], c.column_name)
+  limit 1;
 
--- ---------------------------------------------------------------- checkpoints
+  if key_col is null then
+    raise exception
+      'No uuid column named id, user_id or auth_user_id found on public.incident_portal_accounts. Create public.is_tour_manager() by hand.';
+  end if;
+
+  raise notice 'is_tour_manager() will match incident_portal_accounts.% against auth.uid()', key_col;
+
+  execute format($fmt$
+    create or replace function public.is_tour_manager()
+    returns boolean language sql stable security definer
+    set search_path = public
+    as $body$
+      select exists (
+        select 1
+        from public.incident_portal_accounts a
+        where a.%I = auth.uid()
+          and lower(a.role::text) = any (array['admin'])   -- <<< roles allowed to enrol tags
+      );
+    $body$;
+  $fmt$, key_col);
+end
+$do$;
+
+-- ---------------------------------------------------------------- 3. checkpoints
 -- A named NFC checkpoint at a site. tag_uid is filled in when a tag is enrolled
--- from the phone (Set Up Tags) or from the admin portal.
+-- from the phone (Set Up Tags) or from the future admin portal.
 create table if not exists public.checkpoints (
   id          uuid primary key default gen_random_uuid(),
   property_id uuid not null references public.properties(id) on delete cascade,
@@ -54,7 +95,7 @@ create trigger checkpoints_set_updated_at
   before update on public.checkpoints
   for each row execute function public.set_updated_at();
 
--- ---------------------------------------------------------------- tours (routes)
+-- ---------------------------------------------------------------- 4. tours (routes)
 -- Optional named routes: an ordered subset of a site's checkpoints. Sites with no
 -- routes simply use "All checkpoints" in the app.
 create table if not exists public.tours (
@@ -82,14 +123,18 @@ create table if not exists public.tour_checkpoints (
   primary key (tour_id, checkpoint_id)
 );
 
--- ---------------------------------------------------------------- tour logs
+-- ---------------------------------------------------------------- 5. tour logs
 -- One row per tour an officer performs. Ids are generated on the phone so an
 -- offline tour can be uploaded later without duplicates.
+--
+-- officer_id holds auth.uid() and deliberately carries no foreign key, so this
+-- schema does not depend on how incident_portal_accounts is keyed. Join it to
+-- that table on whichever column is_tour_manager() reported above.
 create table if not exists public.tour_logs (
   id                  uuid primary key,
   property_id         uuid not null references public.properties(id) on delete restrict,
   tour_id             uuid references public.tours(id) on delete set null,
-  officer_id          uuid references public.profiles(id) on delete set null,
+  officer_id          uuid,
   officer_name        text,
   started_at          timestamptz not null,
   completed_at        timestamptz,
@@ -118,14 +163,23 @@ create table if not exists public.tour_scans (
 );
 create index if not exists tour_scans_log_idx on public.tour_scans (tour_log_id, scanned_at);
 
--- ---------------------------------------------------------------- row level security
+-- ---------------------------------------------------------------- 6. row level security
+-- Applied only to the new tables. The existing properties and
+-- incident_portal_accounts tables are left exactly as they are.
 alter table public.checkpoints      enable row level security;
 alter table public.tours            enable row level security;
 alter table public.tour_checkpoints enable row level security;
 alter table public.tour_logs        enable row level security;
 alter table public.tour_scans       enable row level security;
 
--- Reference data: every signed-in officer can read; managers can change.
+-- Supabase grants these automatically to new tables in public, but granting explicitly
+-- means the app works even if that project default was ever changed.
+grant select                       on public.checkpoints, public.tours, public.tour_checkpoints to authenticated;
+grant insert, update               on public.checkpoints, public.tours, public.tour_checkpoints to authenticated;
+grant delete                       on public.checkpoints, public.tours, public.tour_checkpoints to authenticated;
+grant select, insert, update       on public.tour_logs, public.tour_scans                       to authenticated;
+
+-- Reference data: every signed-in officer can read; admins can change.
 drop policy if exists "checkpoints read"   on public.checkpoints;
 drop policy if exists "checkpoints manage" on public.checkpoints;
 create policy "checkpoints read"   on public.checkpoints for select to authenticated using (true);
@@ -144,7 +198,7 @@ create policy "tour_checkpoints read"   on public.tour_checkpoints for select to
 create policy "tour_checkpoints manage" on public.tour_checkpoints for all    to authenticated
   using (public.is_tour_manager()) with check (public.is_tour_manager());
 
--- Tour logs: officers see and write their own; managers see everything.
+-- Tour logs: officers see and write their own; admins see everything.
 drop policy if exists "tour_logs read"   on public.tour_logs;
 drop policy if exists "tour_logs insert" on public.tour_logs;
 drop policy if exists "tour_logs update" on public.tour_logs;
@@ -171,8 +225,8 @@ create policy "tour_scans update" on public.tour_scans for update to authenticat
   with check (exists (select 1 from public.tour_logs l
                       where l.id = tour_log_id and (l.officer_id = auth.uid() or public.is_tour_manager())));
 
--- ---------------------------------------------------------------- portal helper view
--- Handy for the future admin portal: one line per tour with the site name.
+-- ---------------------------------------------------------------- 7. reporting view
+-- One line per tour, for the future admin portal.
 create or replace view public.tour_log_summary as
 select
   l.id,
@@ -192,6 +246,22 @@ from public.tour_logs l
 join public.properties p on p.id = l.property_id
 left join public.tours t on t.id = l.tour_id;
 
--- ---------------------------------------------------------------- example seed (optional)
--- insert into public.checkpoints (property_id, name, sort_order)
--- select id, 'Front Gate', 1 from public.properties where name = 'Example Plaza';
+grant select on public.tour_log_summary to authenticated;
+
+-- ============================================================================
+-- IF THE APP SHOWS AN EMPTY SITE LIST
+-- ----------------------------------------------------------------------------
+-- The incident project's own policies decide whether a signed-in officer may read
+-- public.properties. If row level security is on there with no read policy for
+-- authenticated users, the app will sign in but list no sites. Check with:
+--
+--   select relrowsecurity from pg_class where oid = 'public.properties'::regclass;
+--   select policyname, cmd, roles from pg_policies
+--    where schemaname = 'public' and tablename = 'properties';
+--
+-- If a read policy is missing, this adds one. It is left commented out on purpose:
+-- it widens who can read the incident project's site list, so enable it knowingly.
+--
+--   create policy "properties read" on public.properties
+--     for select to authenticated using (true);
+-- ============================================================================

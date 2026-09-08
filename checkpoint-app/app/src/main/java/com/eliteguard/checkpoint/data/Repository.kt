@@ -1,5 +1,6 @@
 package com.eliteguard.checkpoint.data
 
+import com.eliteguard.checkpoint.Config
 import com.eliteguard.checkpoint.net.SupabaseClient
 import com.eliteguard.checkpoint.util.TimeFmt
 import com.eliteguard.checkpoint.util.bool
@@ -36,20 +37,44 @@ class Repository(
     // ------------------------------------------------------------------ auth
 
     fun signIn(username: String, password: String) {
-        api.signIn(username.trim().lowercase(), password)
+        val typed = username.trim()
+        api.signIn(typed.lowercase(), password)
         val userId = session.userId ?: throw ProfileMissing()
-        val rows = api.select("profiles", "select=username,display_name,role&id=eq.${SupabaseClient.encode(userId)}&limit=1")
-        if (rows.length() == 0) {
+        val account = fetchAccount(userId)
+        if (account == null) {
             api.signOut()
             throw ProfileMissing()
         }
-        val profile = rows.getJSONObject(0)
         session.saveProfile(
-            username = profile.str("username") ?: username.trim().lowercase(),
-            displayName = profile.str("display_name"),
-            role = profile.str("role"),
+            username = account.firstValue(Config.USERNAME_COLUMNS) ?: typed.lowercase(),
+            displayName = account.firstValue(Config.DISPLAY_NAME_COLUMNS),
+            role = account.str("role"),
         )
     }
+
+    /**
+     * Reads the signed-in officer's row from the accounts table. The whole row is selected and
+     * the interesting columns are picked by name, so the app does not depend on that table
+     * having any particular shape beyond a `role` column. Accounts keyed by `user_id` rather
+     * than `id` are handled too.
+     */
+    private fun fetchAccount(userId: String): JSONObject? {
+        val encoded = SupabaseClient.encode(userId)
+        for (keyColumn in ACCOUNT_KEY_COLUMNS) {
+            val rows = try {
+                api.select(Config.ACCOUNTS_TABLE, "select=*&$keyColumn=eq.$encoded&limit=1")
+            } catch (e: SupabaseClient.ApiException) {
+                // A 400 means this table has no such column; try the next candidate.
+                if (e.status == 400) continue else throw e
+            }
+            if (rows.length() > 0) return rows.getJSONObject(0)
+        }
+        return null
+    }
+
+    /** First non-blank value among [columns], or null when the row has none of them. */
+    private fun JSONObject.firstValue(columns: List<String>): String? =
+        columns.firstNotNullOfOrNull { column -> str(column)?.trim()?.takeIf { it.isNotEmpty() } }
 
     fun signOut() {
         api.signOut()
@@ -59,7 +84,8 @@ class Repository(
 
     /** Downloads sites, checkpoints and routes and replaces the local cache. */
     fun refreshReferenceData() {
-        val properties = api.select("properties", "select=id,name,address,zone&order=name").mapObjects { it.toProperty() }
+        // Selected with "*" so the app still works if the site table has no address or zone column.
+        val properties = api.select(Config.PROPERTIES_TABLE, "select=*&order=name").mapObjects { it.toProperty() }
         val checkpoints = api.select("checkpoints", "select=id,property_id,name,sort_order,tag_uid,active&active=eq.true&order=sort_order,name")
             .mapObjects { it.toCheckpoint() }
         val tourRows = api.select("tours", "select=id,property_id,name,sort_order&active=eq.true&order=sort_order,name")
@@ -243,6 +269,11 @@ class Repository(
     // ------------------------------------------------------------------ JSON mapping
 
     private fun JSONObject.toProperty() = Property(reqStr("id"), str("name") ?: "(unnamed)", str("address"), str("zone"))
+
+    private companion object {
+        /** Column names tried, in order, when looking up an account by its Supabase Auth user id. */
+        val ACCOUNT_KEY_COLUMNS = listOf("id", "user_id", "auth_user_id")
+    }
 
     private fun JSONObject.toCheckpoint() = Checkpoint(
         id = reqStr("id"),

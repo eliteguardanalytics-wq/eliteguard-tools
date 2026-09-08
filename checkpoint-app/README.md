@@ -2,12 +2,16 @@
 
 Android app for security officers to run NFC checkpoint tours. Each client site has
 named checkpoints; the officer sees the list on the phone, taps each NFC tag as they
-walk the tour, and the checkpoint is marked as scanned with a timestamp. Tours and every
-tag tap are recorded as tour logs in the same Supabase project the Elite Guard web tools use.
+walk the tour, and the checkpoint is marked as scanned with a timestamp.
+
+The app runs against the Elite Guard **incident reporting** Supabase project
+(`fmfcfepwindmioiowvfe`). It shares that project's logins and its `properties` table, and
+adds its own checkpoint and tour-log tables alongside the incident data.
 
 ## What the app does
 
-- **Sign in** with the same username / password as the web tools (`username@eliteguard.internal`).
+- **Sign in** with the same account as the incident reporting portal. Officers can type their
+  full e-mail address, or a bare username, in which case `@eliteguard.internal` is appended.
 - **Sites** list (the `properties` table), each showing how many checkpoints are set up.
 - **Tour screen** per site: the checkpoint list, an optional route picker, Start Tour / End Tour.
   Tapping a tag while a tour is running marks that checkpoint green with the time it was scanned.
@@ -18,7 +22,7 @@ tag tap are recorded as tour logs in the same Supabase project the Elite Guard w
   saved locally first and uploaded automatically whenever the phone is online. The Sites
   screen shows how many records are still waiting to upload.
 - **Resumes** an in-progress tour if the app is closed or the phone restarts.
-- **Set Up Tags** (admins, supervisors and managers only, from the tour screen menu):
+- **Set Up Tags** (accounts with the `admin` role only, from the tour screen menu):
   add or rename checkpoints for a site and enrol NFC tags by selecting a checkpoint and tapping
   a tag. The tag serial is stored on the checkpoint, and the checkpoint id is also written onto
   the tag (NDEF) when the tag is writable.
@@ -26,13 +30,18 @@ tag tap are recorded as tour logs in the same Supabase project the Elite Guard w
 
 ## Backend setup (one time)
 
-1. Open the Supabase project used by the web tools and run
+1. Open the **incident reporting** Supabase project and run
    [`../supabase/checkpoint_schema.sql`](../supabase/checkpoint_schema.sql) in the SQL editor.
-   It creates `checkpoints`, `tours`, `tour_checkpoints`, `tour_logs`, `tour_scans`, the row
-   level security policies, and a `tour_log_summary` view for the future admin portal.
-2. Make sure officers have a row in `profiles` (created by the web tool's user management).
-   Roles `admin`, `supervisor` and `manager` can set up checkpoints from the phone.
-3. Until the admin portal exists, checkpoints are created and tags are enrolled from the app's
+   It adds `address` and `zone` columns to `properties`, creates `checkpoints`, `tours`,
+   `tour_checkpoints`, `tour_logs` and `tour_scans` with their row level security policies,
+   and creates a `tour_log_summary` view for the future admin portal. Re-running it is safe.
+2. Watch for the notice it prints: `is_tour_manager() will match incident_portal_accounts.<col>
+   against auth.uid()`. That confirms it found how your accounts table links to Supabase Auth.
+3. Officers need a row in `incident_portal_accounts`. Accounts whose `role` is `admin` can set up
+   checkpoints and enrol tags from the phone; everyone else can run tours.
+4. If the app signs in but lists no sites, the incident project's own policies are blocking reads
+   of `properties`. The bottom of the SQL file has the check and the one-line fix.
+5. Until the admin portal exists, checkpoints are created and tags enrolled from the app's
    **Set Up Tags** screen, or by inserting rows into `checkpoints` directly.
 
 ## Building
@@ -72,7 +81,7 @@ turned on; the tour screen shows a red banner with a shortcut to settings if it 
 checkpoint-app/
   app/src/main/AndroidManifest.xml
   app/src/main/java/com/eliteguard/checkpoint/
-    App.kt, Config.kt           application singletons and backend settings
+    App.kt, Config.kt           application singletons and all backend settings
     data/Models.kt              Property, Checkpoint, Tour, TourLog, TourScan
     data/Db.kt                  SQLite cache + offline queue
     data/Session.kt             sign-in tokens and officer profile
@@ -99,8 +108,15 @@ checkpoint-app/
   the tag. Either one is enough, so tags that cannot be written still work.
 - **Idempotent uploads.** Logs and scans get UUIDs on the phone and are sent with PostgREST
   upserts, so a retried upload never creates duplicates.
-- The Supabase publishable (anon) key is embedded in `Config.kt`, exactly as it is in the web
-  tools; the server's row level security policies decide what a signed-in officer can do.
+- **All backend settings live in `Config.kt`**: project URL, publishable key, the accounts and
+  sites table names, the login domain, and which roles may enrol tags. Pointing the app at a
+  different project is a one-file change plus a run of the SQL.
+- **The accounts table is read defensively.** The app selects the whole row and picks the officer's
+  name from the first of `display_name`, `full_name`, `name`, `username` or `email` that is
+  present, and finds the row by `id`, `user_id` or `auth_user_id`. It therefore does not depend on
+  `incident_portal_accounts` having any particular shape beyond a `role` column.
+- The publishable (anon) key is embedded in `Config.kt` and is safe to ship; the project's row
+  level security policies decide what a signed-in officer can actually do.
 
 ## Next steps (not in this app)
 

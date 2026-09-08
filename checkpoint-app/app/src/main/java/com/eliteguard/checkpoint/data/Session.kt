@@ -1,6 +1,7 @@
 package com.eliteguard.checkpoint.data
 
 import android.content.Context
+import com.eliteguard.checkpoint.Config
 
 /** Persisted sign-in state (tokens + the officer's profile). Stored in app-private preferences. */
 class Session(context: Context) {
@@ -39,7 +40,7 @@ class Session(context: Context) {
     val isLoggedIn: Boolean get() = accessToken != null && userId != null
 
     /** Roles allowed to create checkpoints and enroll tags from the phone. */
-    val canManageCheckpoints: Boolean get() = role in MANAGER_ROLES
+    val canManageCheckpoints: Boolean get() = role?.trim()?.lowercase() in Config.MANAGER_ROLES
 
     val officerName: String get() = displayName?.takeIf { it.isNotBlank() } ?: username ?: "Officer"
 
@@ -64,7 +65,4 @@ class Session(context: Context) {
         prefs.edit().clear().apply()
     }
 
-    companion object {
-        private val MANAGER_ROLES = setOf("admin", "supervisor", "manager")
-    }
 }
