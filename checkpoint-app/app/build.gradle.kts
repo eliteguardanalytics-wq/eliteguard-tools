@@ -45,8 +45,10 @@ kotlin {
     }
 }
 
-// The app intentionally depends only on the Android framework and the Kotlin
-// standard library (added automatically by the Kotlin plugin). Keeping the
-// dependency surface tiny makes the build fast and predictable.
+// The shipped app intentionally depends only on the Android framework and the
+// Kotlin standard library (added automatically by the Kotlin plugin). Keeping the
+// dependency surface tiny makes the build fast and predictable. JUnit is test-only
+// and never reaches the APK.
 dependencies {
+    testImplementation("junit:junit:4.13.2")
 }

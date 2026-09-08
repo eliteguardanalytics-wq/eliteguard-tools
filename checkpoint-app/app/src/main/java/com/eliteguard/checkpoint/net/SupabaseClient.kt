@@ -40,16 +40,28 @@ class SupabaseClient(private val session: Session) {
 
     // ------------------------------------------------------------------ auth
 
+    /**
+     * Signs in with a username. Supabase Auth needs an e-mail address, so a domain is appended.
+     *
+     * The domain the incident reporting project uses is discovered once: on the first sign-in
+     * every candidate in [Config.LOGIN_DOMAINS] is tried until one authenticates, and that domain
+     * is then remembered for good. Afterwards, and whenever the officer types a full address,
+     * exactly one request is made.
+     */
     fun signIn(username: String, password: String) {
-        val email = if (username.contains('@')) username else "$username@${Config.LOGIN_DOMAIN}"
+        val (domain, response) = resolveSignIn(username.trim(), session.loginDomain) { passwordGrant(it, password) }
+        if (domain != null) session.loginDomain = domain
+        storeTokens(JSONObject(response))
+    }
+
+    private fun passwordGrant(email: String, password: String): String {
         val body = JSONObject().put("email", email).put("password", password)
-        val response = try {
+        return try {
             http("POST", "${Config.SUPABASE_URL}/auth/v1/token?grant_type=password", body.toString(), bearer = null, prefer = null)
         } catch (e: ApiException) {
             if (e.status == 400 || e.status == 401) throw InvalidCredentials()
             throw e
         }
-        storeTokens(JSONObject(response))
     }
 
     fun signOut() {
@@ -151,6 +163,37 @@ class SupabaseClient(private val session: Session) {
     }
 
     companion object {
+        /**
+         * Works out which e-mail addresses to try for [typed], and returns the domain worth
+         * remembering (null when there is nothing new to learn) together with the successful
+         * response body.
+         *
+         * Only a rejected credential moves on to the next candidate. Anything else — no network,
+         * a server error — propagates immediately rather than burning through the remaining
+         * candidates and masking the real cause.
+         */
+        fun resolveSignIn(typed: String, knownDomain: String?, grant: (String) -> String): Pair<String?, String> {
+            val typedIsAddress = typed.contains('@')
+            val addresses = when {
+                typedIsAddress -> listOf(typed)
+                knownDomain != null -> listOf("$typed@$knownDomain")
+                else -> Config.LOGIN_DOMAINS.map { "$typed@$it" }
+            }
+            var rejected: InvalidCredentials? = null
+            for (address in addresses) {
+                val response = try {
+                    grant(address)
+                } catch (e: InvalidCredentials) {
+                    rejected = e
+                    continue
+                }
+                // A full address the officer typed says nothing about the portal's convention.
+                val learned = if (typedIsAddress) null else address.substringAfterLast('@')
+                return learned to response
+            }
+            throw rejected ?: InvalidCredentials()
+        }
+
         private const val CONNECT_TIMEOUT_MS = 15_000
         private const val READ_TIMEOUT_MS = 30_000
         private const val EXPIRY_MARGIN_MS = 60_000L

@@ -4,8 +4,8 @@
 
     <!-- Login -->
     <string name="login_title">Officer Sign In</string>
-    <string name="login_subtitle">Use the same account as the Elite Guard incident reporting portal.</string>
-    <string name="login_username">E-mail or username</string>
+    <string name="login_subtitle">Use the same username and password as the Elite Guard incident reporting portal.</string>
+    <string name="login_username">Username</string>
     <string name="login_password">Password</string>
     <string name="login_button">Sign In</string>
     <string name="login_signing_in">Signing in…</string>

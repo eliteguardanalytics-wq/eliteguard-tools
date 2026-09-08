@@ -37,6 +37,16 @@ class Session(context: Context) {
         get() = prefs.getString("role", null)
         set(value) = prefs.edit().putString("role", value).apply()
 
+    /**
+     * The e-mail domain that successfully authenticated on this phone. Null until the first
+     * successful sign-in. Deliberately survives signing out: it is a fact about the backend,
+     * not about the officer, and keeping it means later sign-ins take one request instead of
+     * probing the candidate list again.
+     */
+    var loginDomain: String?
+        get() = prefs.getString("login_domain", null)
+        set(value) = prefs.edit().putString("login_domain", value).apply()
+
     val isLoggedIn: Boolean get() = accessToken != null && userId != null
 
     /** Roles allowed to create checkpoints and enroll tags from the phone. */
@@ -62,7 +72,9 @@ class Session(context: Context) {
     }
 
     fun clear() {
+        val domain = loginDomain
         prefs.edit().clear().apply()
+        if (domain != null) loginDomain = domain
     }
 
 }

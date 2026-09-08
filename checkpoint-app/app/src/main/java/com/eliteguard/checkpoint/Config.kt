@@ -22,10 +22,23 @@ object Config {
     const val PROPERTIES_TABLE = "properties"
 
     /**
-     * Officers may sign in with their full e-mail address. If they type a bare username instead,
-     * this domain is appended before the credentials are sent to Supabase Auth.
+     * Officers sign in with a username. Supabase Auth authenticates on an e-mail address, so the
+     * username is turned into one by appending a domain, the same way the incident reporting
+     * portal does it.
+     *
+     * The exact domain that project uses is not recorded here, so the app tries these in order on
+     * the first sign-in and permanently remembers whichever one works (see Session.loginDomain).
+     * Every later sign-in makes a single request. Once you know the real domain, put it first in
+     * this list, or make it the only entry.
+     *
+     * To find it: open any row in the incident project's auth.users table and look at its e-mail,
+     * or find the line in the portal's login code that builds the address.
      */
-    const val LOGIN_DOMAIN = "eliteguard.internal"
+    val LOGIN_DOMAINS = listOf(
+        "eliteguard.internal",
+        "eliteguard.local",
+        "eliteguard.app",
+    )
 
     /** Roles allowed to create checkpoints and enrol NFC tags from the phone. */
     val MANAGER_ROLES = setOf("admin")

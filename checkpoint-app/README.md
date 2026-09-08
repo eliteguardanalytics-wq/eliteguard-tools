@@ -10,8 +10,7 @@ adds its own checkpoint and tour-log tables alongside the incident data.
 
 ## What the app does
 
-- **Sign in** with the same account as the incident reporting portal. Officers can type their
-  full e-mail address, or a bare username, in which case `@eliteguard.internal` is appended.
+- **Sign in** with the same username and password as the incident reporting portal.
 - **Sites** list (the `properties` table), each showing how many checkpoints are set up.
 - **Tour screen** per site: the checkpoint list, an optional route picker, Start Tour / End Tour.
   Tapping a tag while a tour is running marks that checkpoint green with the time it was scanned.
@@ -51,6 +50,7 @@ platform 36 installed.
 
 ```bash
 cd checkpoint-app
+./gradlew test                 # unit tests (no device needed)
 ./gradlew assembleDebug        # app/build/outputs/apk/debug/app-debug.apk
 ./gradlew assembleRelease      # needs a signing config; see below
 ```
@@ -111,6 +111,12 @@ checkpoint-app/
 - **All backend settings live in `Config.kt`**: project URL, publishable key, the accounts and
   sites table names, the login domain, and which roles may enrol tags. Pointing the app at a
   different project is a one-file change plus a run of the SQL.
+- **The login domain is discovered, not hard-coded.** Officers sign in with a username, but
+  Supabase Auth authenticates on an e-mail address, so the portal appends a domain. Which domain
+  the incident project uses is not recorded in this repo, so on the very first sign-in the app
+  tries each candidate in `Config.LOGIN_DOMAINS` and permanently remembers the one that works.
+  Every later sign-in is a single request. Once the real domain is known, put it first in that
+  list, or make it the only entry. `app/src/test/java/.../LoginDomainTest.kt` covers this.
 - **The accounts table is read defensively.** The app selects the whole row and picks the officer's
   name from the first of `display_name`, `full_name`, `name`, `username` or `email` that is
   present, and finds the row by `id`, `user_id` or `auth_user_id`. It therefore does not depend on
