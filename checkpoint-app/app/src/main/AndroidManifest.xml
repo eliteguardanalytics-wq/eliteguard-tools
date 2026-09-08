@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- The app is useless without NFC, so hide it from the Play Store on devices that lack it. -->
+    <uses-feature android:name="android.hardware.nfc" android:required="true" />
+
+    <application
+        android:name=".App"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.EliteGuard">
+
+        <activity
+            android:name=".ui.LoginActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Tapping an enrolled checkpoint tag while the app is closed opens the app. -->
+            <intent-filter>
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="vnd.android.nfc" android:host="ext" android:pathPrefix="/eliteguard.internal:checkpoint" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".ui.SitesActivity" android:exported="false" />
+        <activity android:name=".ui.TourActivity" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".ui.SetupActivity" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".ui.HistoryActivity" android:exported="false" />
+    </application>
+</manifest>
