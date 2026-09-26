@@ -17,47 +17,30 @@
         android:paddingEnd="@dimen/screen_padding"
         android:paddingBottom="14dp">
 
-        <LinearLayout
-            android:id="@+id/route_row"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:visibility="gone">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/tour_route_label"
-                android:textColor="#CCFFFFFF"
-                android:textSize="13sp" />
-
-            <Spinner
-                android:id="@+id/route"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:layout_weight="1"
-                android:theme="@style/ToolbarTheme" />
-        </LinearLayout>
-
         <TextView
             android:id="@+id/status"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
             android:textColor="#FFFFFF"
-            android:textSize="15sp"
+            android:textSize="16sp"
             android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/started"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="#CCFFFFFF"
+            android:textSize="13sp" />
 
         <ProgressBar
             android:id="@+id/progress"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
             android:layout_height="8dp"
-            android:layout_marginTop="8dp"
-            android:progressTint="@color/gold"
-            android:progressBackgroundTint="#44FFFFFF" />
+            android:layout_marginTop="10dp"
+            android:progressBackgroundTint="#44FFFFFF"
+            android:progressTint="@color/gold" />
     </LinearLayout>
 
     <TextView
@@ -109,14 +92,8 @@
         android:padding="@dimen/screen_padding">
 
         <Button
-            android:id="@+id/start"
-            style="@style/PrimaryButton"
-            android:text="@string/tour_start" />
-
-        <Button
             android:id="@+id/end"
             style="@style/DangerButton"
-            android:text="@string/tour_end"
-            android:visibility="gone" />
+            android:text="@string/tour_end" />
     </LinearLayout>
 </LinearLayout>

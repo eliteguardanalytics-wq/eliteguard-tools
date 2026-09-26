@@ -8,23 +8,40 @@ The app runs against the Elite Guard **incident reporting** Supabase project
 (`fmfcfepwindmioiowvfe`). It shares that project's logins and its `properties` table, and
 adds its own checkpoint and tour-log tables alongside the incident data.
 
+## How it fits together
+
+The hierarchy is **site → tour → checkpoint**. A checkpoint is a name, and that name is what
+gets written onto its NFC tag.
+
+1. In the admin portal an administrator creates a site, adds tours to it, and adds checkpoint
+   names to each tour (one at a time or in bulk). Names only — no tags involved.
+2. An administrator signs into this app, picks a tour, selects a checkpoint name, and holds a
+   blank tag to the phone. The name is written onto the tag and stays there until an
+   administrator writes something else onto it.
+3. An officer signs in, presses **Start Tour**, picks a tour, and walks it. Each tag tap turns
+   that checkpoint green and drops it to the bottom of the list, so what is still outstanding
+   stays at the top. **End Tour** finishes the tour whether or not everything was scanned.
+
 ## What the app does
 
 - **Sign in** with the same username and password as the incident reporting portal.
-- **Sites** list (the `properties` table), each showing how many checkpoints are set up.
-- **Tour screen** per site: the checkpoint list, an optional route picker, Start Tour / End Tour.
-  Tapping a tag while a tour is running marks that checkpoint green with the time it was scanned.
-  Unknown tags, tags from another site, and repeat taps give a distinct beep/vibration and message.
-- **End Tour** shows what was missed before confirming, then records the log as
+- **Home**: one big **Start Tour** button, plus **Set Up Tags** for administrators. An unfinished
+  tour turns the button into **Resume Tour**.
+- **Tour picker**: every tour, grouped under its site, with its checkpoint count.
+- **Tour screen**: the tour's checkpoint names. A tag tap matches the name written on the tag
+  against this tour's checkpoints; a match turns green, shows the time, and moves to the bottom.
+  A repeat tap, a name that is not on this tour, and a tag with nothing written on it each get a
+  distinct beep and vibration with an explanation.
+- **End Tour** lists anything not scanned before confirming, then records the tour as
   `completed` or `incomplete`.
-- **Works offline.** Sites and checkpoints are cached on the phone; tour logs and scans are
-  saved locally first and uploaded automatically whenever the phone is online. The Sites
-  screen shows how many records are still waiting to upload.
+- **Works offline.** Sites, tours and checkpoints are cached on the phone; tour logs and scans are
+  saved locally first and uploaded automatically whenever the phone is online. The home screen
+  shows how many records are still waiting to upload.
 - **Resumes** an in-progress tour if the app is closed or the phone restarts.
-- **Set Up Tags** (accounts with the `admin` role only, from the tour screen menu):
-  add or rename checkpoints for a site and enrol NFC tags by selecting a checkpoint and tapping
-  a tag. The tag serial is stored on the checkpoint, and the checkpoint id is also written onto
-  the tag (NDEF) when the tag is writable.
+- **Set Up Tags** (accounts with the `admin` role only): pick a tour, select a checkpoint, hold a
+  tag to the phone. The screen shows how many of the tour's checkpoints already have a tag. If the
+  tag already carried a different name, the app says what it replaced. Checkpoints can also be
+  added in bulk or renamed here, so a tour can be set up from the field before the portal exists.
 - **Tour history** of tours recorded on this phone, with upload status.
 
 ## Backend setup (one time)
@@ -33,15 +50,18 @@ adds its own checkpoint and tour-log tables alongside the incident data.
    [`../supabase/checkpoint_schema.sql`](../supabase/checkpoint_schema.sql) in the SQL editor.
    It adds `address` and `zone` columns to `properties`, creates `checkpoints`, `tours`,
    `tour_checkpoints`, `tour_logs` and `tour_scans` with their row level security policies,
-   and creates a `tour_log_summary` view for the future admin portal. Re-running it is safe.
+   and creates a `tour_log_summary` view for the admin portal. Re-running it is safe. If you ran
+   an earlier version of this file, where checkpoints hung off a site, it migrates them under one
+   "Main Tour" per site and clears the old tag serials, since those tags now need the name
+   written onto them.
 2. Watch for the notice it prints: `is_tour_manager() will match incident_portal_accounts.<col>
    against auth.uid()`. That confirms it found how your accounts table links to Supabase Auth.
 3. Officers need a row in `incident_portal_accounts`. Accounts whose `role` is `admin` can set up
    checkpoints and enrol tags from the phone; everyone else can run tours.
 4. If the app signs in but lists no sites, the incident project's own policies are blocking reads
    of `properties`. The bottom of the SQL file has the check and the one-line fix.
-5. Until the admin portal exists, checkpoints are created and tags enrolled from the app's
-   **Set Up Tags** screen, or by inserting rows into `checkpoints` directly.
+5. Create tours and checkpoints in the admin portal, or until it exists from the app's
+   **Set Up Tags** screen, or by inserting rows into `tours` and `checkpoints` directly.
 
 ## Building
 
@@ -82,16 +102,18 @@ checkpoint-app/
   app/src/main/AndroidManifest.xml
   app/src/main/java/com/eliteguard/checkpoint/
     App.kt, Config.kt           application singletons and all backend settings
-    data/Models.kt              Property, Checkpoint, Tour, TourLog, TourScan
+    data/Models.kt              Property, Tour, Checkpoint, TourLog, TourScan,
+                                plus the checklist ordering and name-matching rules
     data/Db.kt                  SQLite cache + offline queue
     data/Session.kt             sign-in tokens and officer profile
     data/Repository.kt          sync, tour start/scan/end, checkpoint setup
     net/SupabaseClient.kt       tiny Supabase auth + PostgREST client
     nfc/NfcTags.kt              tag serial, NDEF read/write helpers
     ui/LoginActivity.kt         sign in
-    ui/SitesActivity.kt         site list, refresh, sync status
-    ui/TourActivity.kt          checkpoint list + NFC reader mode
-    ui/SetupActivity.kt         add checkpoints, enrol tags
+    ui/HomeActivity.kt          Start Tour, sync status, refresh
+    ui/TourPickerActivity.kt    tours grouped by site
+    ui/TourActivity.kt          the officer's checklist + NFC reader mode
+    ui/SetupActivity.kt         write checkpoint names onto tags
     ui/HistoryActivity.kt       tours recorded on this phone
   app/src/main/res/             layouts, strings, colours, icons
 ```
@@ -104,8 +126,15 @@ checkpoint-app/
 - **NFC reader mode** (`NfcAdapter.enableReaderMode`) is used instead of intent dispatch, so
   the tour screen receives taps directly, the system "new tag" popup and sound are suppressed,
   and the phone does not need any special configuration.
-- **Tag matching** is by the tag's serial number first, then by the checkpoint id written on
-  the tag. Either one is enough, so tags that cannot be written still work.
+- **Tags carry the checkpoint name, and matching is by name.** Nothing has to be pre-registered,
+  and one physical tag reading "Front Gate" serves the "Front Gate" checkpoint on every tour that
+  has one. Matching ignores case and stray whitespace. Because a name is the identity, the
+  database enforces that names are unique within a tour.
+- **Each tag is written twice**: an app-specific NDEF external record, and a plain text record so
+  a generic NFC reader shows a human the checkpoint name too. Tags are never write-locked, so an
+  administrator can always re-point one.
+- **`tag_uid` is audit only.** The tag serial is recorded on the checkpoint and on each scan so you
+  can see which physical tag was used, but matching never depends on it.
 - **Idempotent uploads.** Logs and scans get UUIDs on the phone and are sent with PostgREST
   upserts, so a retried upload never creates duplicates.
 - **All backend settings live in `Config.kt`**: project URL, publishable key, the accounts and
@@ -126,7 +155,8 @@ checkpoint-app/
 
 ## Next steps (not in this app)
 
-- Web admin portal to manage sites, checkpoints, routes and to review tour logs
-  (`tour_log_summary` view and `tour_scans` table are ready for it).
+- **Web admin portal** at `eliteguard.siloam.one`: a site list, add/edit tours per site, and
+  add checkpoints per tour with a bulk-add box (names only). Plus tour log review, for which the
+  `tour_log_summary` view and `tour_scans` table are ready.
 - Optional GPS capture per scan and photo/incident notes at a checkpoint.
 - Scheduled tour compliance reporting (expected vs. actual tours per shift).

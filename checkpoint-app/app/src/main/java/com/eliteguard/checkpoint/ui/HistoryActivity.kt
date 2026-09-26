@@ -63,7 +63,7 @@ class HistoryActivity : Activity() {
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
             val view = convertView ?: LayoutInflater.from(parent.context).inflate(R.layout.row_history, parent, false)
             val log = items[position]
-            val title = if (log.tourName != null) "${log.propertyName} · ${log.tourName}" else log.propertyName
+            val title = "${log.propertyName} · ${log.tourName}"
             view.findViewById<TextView>(R.id.site).text = title
             val status = view.findViewById<TextView>(R.id.status)
             when (log.status) {

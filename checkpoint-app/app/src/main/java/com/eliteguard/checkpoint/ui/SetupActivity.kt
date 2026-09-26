@@ -22,43 +22,52 @@ import android.widget.Toolbar
 import com.eliteguard.checkpoint.App
 import com.eliteguard.checkpoint.R
 import com.eliteguard.checkpoint.data.Checkpoint
-import com.eliteguard.checkpoint.data.Property
-import com.eliteguard.checkpoint.data.Repository
+import com.eliteguard.checkpoint.data.Tour
+import com.eliteguard.checkpoint.data.normalizeName
+import com.eliteguard.checkpoint.net.SupabaseClient
 import com.eliteguard.checkpoint.nfc.NfcTags
 import com.eliteguard.checkpoint.util.Bg
+import com.eliteguard.checkpoint.util.TimeFmt
+import java.io.IOException
 
 /**
- * Supervisor/admin screen for naming checkpoints and enrolling their NFC tags:
- * pick a checkpoint from the list, then tap a tag to link it.
+ * Administrator screen for writing checkpoint names onto tags: select a checkpoint from this
+ * tour, then hold a tag against the phone and the name is written to it. The name stays on the
+ * tag until an administrator overwrites it.
+ *
+ * Checkpoints are normally created in the admin portal; adding and renaming them here is kept so
+ * a tour can be set up from the field.
  */
 class SetupActivity : Activity() {
 
     private val app by lazy { App.get(this) }
     private val repo by lazy { app.repo }
 
-    private lateinit var property: Property
+    private lateinit var tour: Tour
     private var checkpoints: List<Checkpoint> = emptyList()
     private var selected: Checkpoint? = null
 
     private lateinit var hint: TextView
     private lateinit var nfcBanner: TextView
+    private lateinit var progressText: TextView
     private val adapter = SetupAdapter()
     private var nfc: NfcAdapter? = null
     private var busy = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val loaded = intent.getStringExtra(EXTRA_PROPERTY_ID)?.let { app.db.property(it) }
+        val loaded = intent.getStringExtra(EXTRA_TOUR_ID)?.let { app.db.tour(it) }
         if (loaded == null || !app.session.canManageCheckpoints) {
             finish()
             return
         }
-        property = loaded
+        tour = loaded
         setContentView(R.layout.activity_setup)
         setupToolbar(findViewById<Toolbar>(R.id.toolbar), getString(R.string.setup_title), showUp = true)
-        actionBar?.subtitle = property.name
+        actionBar?.subtitle = "${tour.propertyName} · ${tour.name}"
         hint = findViewById(R.id.hint)
         nfcBanner = findViewById(R.id.nfc_banner)
+        progressText = findViewById(R.id.progress_text)
         nfcBanner.setOnClickListener { startActivity(Intent(Settings.ACTION_NFC_SETTINGS)) }
         val list = findViewById<ListView>(R.id.list)
         list.adapter = adapter
@@ -71,7 +80,7 @@ class SetupActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        if (!::property.isInitialized) return
+        if (!::tour.isInitialized) return
         reload()
         val adapter = nfc
         when {
@@ -91,7 +100,7 @@ class SetupActivity : Activity() {
 
     override fun onPause() {
         super.onPause()
-        if (::property.isInitialized) nfc?.disableReaderMode(this)
+        if (::tour.isInitialized) nfc?.disableReaderMode(this)
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -104,56 +113,52 @@ class SetupActivity : Activity() {
             finish(); true
         }
         R.id.action_add -> {
-            promptName(null); true
+            promptNames(null); true
         }
         else -> super.onOptionsItemSelected(item)
     }
 
     private fun reload() {
         val db = app.db
-        Bg.run({ db.checkpoints(property.id) }) { result ->
+        val current = tour
+        Bg.run({ db.checkpoints(current.id) }) { result ->
             result.onSuccess { list ->
                 checkpoints = list
                 selected = list.firstOrNull { it.id == selected?.id }
                 adapter.notifyDataSetChanged()
-                renderHint()
+                render()
             }
         }
     }
 
-    private fun renderHint() {
+    private fun render() {
         val current = selected
-        hint.text = if (current == null) getString(R.string.setup_hint) else getString(R.string.setup_selected_hint, current.name)
+        hint.text = if (current == null) {
+            getString(R.string.setup_hint)
+        } else {
+            getString(R.string.setup_selected_hint, current.name)
+        }
+        progressText.text = getString(R.string.setup_progress, checkpoints.count { it.hasTag }, checkpoints.size)
     }
 
     private fun select(checkpoint: Checkpoint) {
-        if (selected?.id == checkpoint.id) {
-            selected = null
-            adapter.notifyDataSetChanged()
-            renderHint()
-            return
-        }
-        if (checkpoint.tagUid != null) {
-            confirm(getString(R.string.setup_replace_title), getString(R.string.setup_replace_message, checkpoint.name), getString(R.string.setup_replace)) {
-                selected = checkpoint
-                adapter.notifyDataSetChanged()
-                renderHint()
-            }
-            return
-        }
-        selected = checkpoint
+        selected = if (selected?.id == checkpoint.id) null else checkpoint
         adapter.notifyDataSetChanged()
-        renderHint()
+        render()
     }
 
     private fun showOptions(checkpoint: Checkpoint) {
-        val options = arrayOf(getString(R.string.setup_rename), getString(R.string.setup_deactivate))
+        val options = arrayOf(getString(R.string.setup_rename), getString(R.string.setup_remove))
         AlertDialog.Builder(this)
             .setTitle(checkpoint.name)
             .setItems(options) { _, which ->
                 when (which) {
-                    0 -> promptName(checkpoint)
-                    1 -> confirm(getString(R.string.setup_deactivate), getString(R.string.setup_deactivate_message, checkpoint.name), getString(R.string.setup_remove)) {
+                    0 -> promptNames(checkpoint)
+                    1 -> confirm(
+                        getString(R.string.setup_remove),
+                        getString(R.string.setup_remove_message, checkpoint.name),
+                        getString(R.string.setup_remove_confirm),
+                    ) {
                         runOnline({ repo.deactivateCheckpoint(checkpoint) }) { toast(getString(R.string.setup_saved)) }
                     }
                 }
@@ -161,23 +166,44 @@ class SetupActivity : Activity() {
             .show()
     }
 
-    /** Add (checkpoint == null) or rename a checkpoint. */
-    private fun promptName(checkpoint: Checkpoint?) {
-        val view = LayoutInflater.from(this).inflate(R.layout.dialog_checkpoint_name, null)
-        val input = view.findViewById<EditText>(R.id.name)
-        if (checkpoint != null) input.setText(checkpoint.name)
+    /** Adds checkpoints (one name per line) when [checkpoint] is null, otherwise renames it. */
+    private fun promptNames(checkpoint: Checkpoint?) {
+        val view = LayoutInflater.from(this).inflate(R.layout.dialog_checkpoint_names, null)
+        val input = view.findViewById<EditText>(R.id.names)
+        val dialogHint = view.findViewById<TextView>(R.id.hint)
+        if (checkpoint == null) {
+            dialogHint.setText(R.string.setup_add_hint)
+        } else {
+            dialogHint.setText(R.string.setup_rename_warning)
+            input.setText(checkpoint.name)
+            input.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS
+            input.minLines = 1
+        }
         AlertDialog.Builder(this)
-            .setTitle(if (checkpoint == null) getString(R.string.setup_add_title) else getString(R.string.setup_rename))
+            .setTitle(if (checkpoint == null) R.string.setup_add_title else R.string.setup_rename_title)
             .setView(view)
-            .setPositiveButton(R.string.setup_add_save) { _, _ ->
-                val name = input.text.toString().trim()
-                if (name.isEmpty()) {
-                    toast(getString(R.string.setup_add_missing))
-                    return@setPositiveButton
-                }
+            .setPositiveButton(if (checkpoint == null) R.string.setup_add_save else R.string.setup_add_save) { _, _ ->
+                val typed = input.text.toString()
                 if (checkpoint == null) {
-                    runOnline({ repo.createCheckpoint(property, name) }) { toast(getString(R.string.setup_saved)) }
+                    val names = typed.lines().map { it.trim() }.filter { it.isNotEmpty() }
+                    if (names.isEmpty()) {
+                        toast(getString(R.string.setup_add_missing))
+                        return@setPositiveButton
+                    }
+                    val current = tour
+                    runOnline({ repo.createCheckpoints(current, names) }) { created ->
+                        if (created.isEmpty()) {
+                            toast(getString(R.string.setup_added_none), long = true)
+                        } else {
+                            toast(getString(R.string.setup_added, created.size))
+                        }
+                    }
                 } else {
+                    val name = typed.trim()
+                    if (name.isEmpty()) {
+                        toast(getString(R.string.setup_add_missing))
+                        return@setPositiveButton
+                    }
                     runOnline({ repo.renameCheckpoint(checkpoint, name) }) { toast(getString(R.string.setup_saved)) }
                 }
             }
@@ -185,7 +211,7 @@ class SetupActivity : Activity() {
             .show()
     }
 
-    /** Runs a server call, shows a friendly error if offline, and refreshes the list afterwards. */
+    /** Runs a server call, reports a friendly error, and refreshes the list afterwards. */
     private fun <T> runOnline(work: () -> T, onSuccess: (T) -> Unit) {
         if (busy) return
         busy = true
@@ -194,12 +220,9 @@ class SetupActivity : Activity() {
             result.onSuccess(onSuccess)
             result.onFailure { error ->
                 when (error) {
-                    is com.eliteguard.checkpoint.net.SupabaseClient.AuthException -> handleAuthExpired()
-                    is Repository.TagTaken -> toast(
-                        error.otherCheckpoint?.let { getString(R.string.setup_tag_taken, it.name) } ?: getString(R.string.setup_tag_taken_other), long = true
-                    )
-                    is com.eliteguard.checkpoint.net.SupabaseClient.ApiException -> toast(describe(error), long = true)
-                    is java.io.IOException -> toast(getString(R.string.setup_offline), long = true)
+                    is SupabaseClient.AuthException -> handleAuthExpired()
+                    is SupabaseClient.ApiException -> toast(describe(error), long = true)
+                    is IOException -> toast(getString(R.string.setup_offline), long = true)
                     else -> toast(describe(error), long = true)
                 }
             }
@@ -209,24 +232,45 @@ class SetupActivity : Activity() {
 
     // ------------------------------------------------------------------ NFC
 
+    /**
+     * Writes the selected checkpoint's name while the tag is still in the field.
+     *
+     * Re-pointing a tag is a normal administrator action, so the write is not gated behind a
+     * confirmation dialog: the tag would have left the field by the time it was answered, and the
+     * write would fail. What the tag previously said is read first and reported afterwards instead,
+     * so an admin who repointed a tag by mistake can see it and put it back.
+     */
     private fun onTagDiscovered(tag: Tag) {
         val uid = NfcTags.uidHex(tag)
         val target = selected
-        // Write the checkpoint id onto the tag while it is still in range; the link by serial is what matters.
-        val written = if (target != null) NfcTags.writeCheckpointId(tag, target.id) else false
-        Bg.post { handleTag(uid, target, written) }
-    }
-
-    private fun handleTag(uid: String, target: Checkpoint?, written: Boolean) {
+        val existing = NfcTags.readName(tag)
         if (target == null) {
-            val owner = checkpoints.firstOrNull { it.tagUid == uid } ?: app.db.checkpointByTag(uid)
-            Feedback.warning(this)
-            toast(if (owner != null) getString(R.string.setup_tag_taken, owner.name) else getString(R.string.setup_no_selection), long = true)
+            Bg.post {
+                Feedback.warning(this)
+                toast(getString(R.string.setup_no_selection), long = true)
+                if (existing != null) toast(getString(R.string.setup_tag_says, existing), long = true)
+            }
             return
         }
-        runOnline({ repo.linkTag(target, uid) }) { linked ->
+        val written = NfcTags.writeName(tag, target.name)
+        val replaced = existing?.takeIf { normalizeName(it) != normalizeName(target.name) }
+        Bg.post { finishWrite(target, uid, written, replaced) }
+    }
+
+    private fun finishWrite(target: Checkpoint, uid: String, written: Boolean, replaced: String?) {
+        if (!written) {
+            Feedback.warning(this)
+            toast(getString(R.string.setup_write_failed), long = true)
+            return
+        }
+        runOnline({ repo.recordTagWritten(target, uid) }) { updated ->
             Feedback.success(this)
-            toast(if (written) getString(R.string.setup_linked_written, linked.name) else getString(R.string.setup_linked, linked.name), long = true)
+            val message = if (replaced != null) {
+                getString(R.string.setup_written_replaced, replaced, updated.name)
+            } else {
+                getString(R.string.setup_written, updated.name)
+            }
+            toast(message, long = true)
             selected = null
         }
     }
@@ -242,25 +286,33 @@ class SetupActivity : Activity() {
             val view = convertView ?: LayoutInflater.from(parent.context).inflate(R.layout.row_checkpoint, parent, false)
             val checkpoint = checkpoints[position]
             val isSelected = selected?.id == checkpoint.id
-            val linked = checkpoint.tagUid != null
-            view.findViewById<View>(R.id.card).setBackgroundResource(if (isSelected) R.drawable.bg_card_selected else R.drawable.bg_card)
+            val background = when {
+                isSelected -> R.drawable.bg_card_selected
+                checkpoint.hasTag -> R.drawable.bg_card_scanned
+                else -> R.drawable.bg_card
+            }
+            view.findViewById<View>(R.id.card).setBackgroundResource(background)
             view.findViewById<TextView>(R.id.step).apply {
                 text = (position + 1).toString()
-                visibility = if (linked) View.GONE else View.VISIBLE
+                visibility = if (checkpoint.hasTag) View.GONE else View.VISIBLE
             }
-            view.findViewById<ImageView>(R.id.check).visibility = if (linked) View.VISIBLE else View.GONE
+            view.findViewById<ImageView>(R.id.check).visibility = if (checkpoint.hasTag) View.VISIBLE else View.GONE
             view.findViewById<TextView>(R.id.name).text = checkpoint.name
             val detail = view.findViewById<TextView>(R.id.detail)
-            detail.text = if (linked) getString(R.string.setup_tag_uid, checkpoint.tagUid) else getString(R.string.setup_tag_none)
-            detail.setTextColor(getColor(if (linked) R.color.success else R.color.text_secondary))
+            detail.text = if (checkpoint.hasTag) {
+                getString(R.string.setup_tag_ready, TimeFmt.dateTime(checkpoint.tagWrittenAt))
+            } else {
+                getString(R.string.setup_tag_none)
+            }
+            detail.setTextColor(getColor(if (checkpoint.hasTag) R.color.success else R.color.text_secondary))
             return view
         }
     }
 
     companion object {
-        private const val EXTRA_PROPERTY_ID = "property_id"
+        private const val EXTRA_TOUR_ID = "tour_id"
 
-        fun intent(context: Context, propertyId: String): Intent =
-            Intent(context, SetupActivity::class.java).putExtra(EXTRA_PROPERTY_ID, propertyId)
+        fun intent(context: Context, tourId: String): Intent =
+            Intent(context, SetupActivity::class.java).putExtra(EXTRA_TOUR_ID, tourId)
     }
 }

@@ -27,12 +27,29 @@ class Repository(
     private val deviceId: String,
 ) {
 
-    class ProfileMissing : IOException("No profile for this account")
+    class ProfileMissing : IOException("No account for this login")
 
-    /** Thrown when a tag is already linked to a different checkpoint. */
-    class TagTaken(val otherCheckpoint: Checkpoint?) : IOException("Tag already linked")
+    /** What a tag tap meant. */
+    enum class ScanOutcome {
+        /** Matched a checkpoint on this tour that had not been scanned yet. */
+        SCANNED,
 
-    enum class ScanOutcome { SCANNED, DUPLICATE, NOT_IN_ROUTE }
+        /** Matched a checkpoint on this tour that was already scanned. */
+        DUPLICATE,
+
+        /** The tag carries a name, but no checkpoint on this tour has it. */
+        NOT_ON_TOUR,
+
+        /** The tag carries no checkpoint name at all; an admin has not set it up. */
+        BLANK,
+    }
+
+    /** The result of a tag tap: what happened, which checkpoint (if any), and the refreshed log. */
+    data class ScanResult(
+        val outcome: ScanOutcome,
+        val checkpointName: String?,
+        val log: TourLog,
+    )
 
     // ------------------------------------------------------------------ auth
 
@@ -50,6 +67,10 @@ class Repository(
             displayName = account.firstValue(Config.DISPLAY_NAME_COLUMNS),
             role = account.str("role"),
         )
+    }
+
+    fun signOut() {
+        api.signOut()
     }
 
     /**
@@ -76,29 +97,28 @@ class Repository(
     private fun JSONObject.firstValue(columns: List<String>): String? =
         columns.firstNotNullOfOrNull { column -> str(column)?.trim()?.takeIf { it.isNotEmpty() } }
 
-    fun signOut() {
-        api.signOut()
-    }
-
     // ------------------------------------------------------------------ sync
 
-    /** Downloads sites, checkpoints and routes and replaces the local cache. */
+    /** Downloads sites, tours and checkpoints and replaces the local cache. */
     fun refreshReferenceData() {
         // Selected with "*" so the app still works if the site table has no address or zone column.
         val properties = api.select(Config.PROPERTIES_TABLE, "select=*&order=name").mapObjects { it.toProperty() }
-        val checkpoints = api.select("checkpoints", "select=id,property_id,name,sort_order,tag_uid,active&active=eq.true&order=sort_order,name")
+        val siteNames = properties.associate { it.id to it.name }
+        val tours = api.select("tours", "select=id,property_id,name,sort_order&active=eq.true&order=sort_order,name")
+            .mapObjects { row ->
+                val propertyId = row.reqStr("property_id")
+                Tour(
+                    id = row.reqStr("id"),
+                    propertyId = propertyId,
+                    propertyName = siteNames[propertyId] ?: "(unknown site)",
+                    name = row.str("name") ?: "(unnamed tour)",
+                    sortOrder = row.int("sort_order"),
+                )
+            }
+        val checkpoints = api
+            .select("checkpoints", "select=id,tour_id,name,sort_order,tag_uid,tag_written_at,active&active=eq.true&order=sort_order,name")
             .mapObjects { it.toCheckpoint() }
-        val tourRows = api.select("tours", "select=id,property_id,name,sort_order&active=eq.true&order=sort_order,name")
-        val tourCheckpoints = api.select("tour_checkpoints", "select=tour_id,checkpoint_id,sort_order&order=sort_order")
-        val byTour = HashMap<String, MutableList<String>>()
-        tourCheckpoints.mapObjects { row ->
-            byTour.getOrPut(row.reqStr("tour_id")) { ArrayList() }.add(row.reqStr("checkpoint_id"))
-        }
-        val tours = tourRows.mapObjects { row ->
-            val id = row.reqStr("id")
-            Tour(id, row.reqStr("property_id"), row.reqStr("name"), row.int("sort_order"), byTour[id] ?: emptyList())
-        }
-        db.replaceReferenceData(properties, checkpoints, tours)
+        db.replaceReferenceData(properties, tours, checkpoints)
     }
 
     /**
@@ -141,28 +161,20 @@ class Repository(
         try {
             pushPending()
         } catch (e: Exception) {
-            // Will be retried from the sites screen.
+            // Will be retried from the home screen.
         }
     }
 
     // ------------------------------------------------------------------ tours
 
-    /** The checkpoints an officer must visit for the chosen route (or every active checkpoint). */
-    fun routeCheckpoints(property: Property, tour: Tour?): List<Checkpoint> {
-        val all = db.checkpoints(property.id)
-        if (tour == null) return all
-        val byId = all.associateBy { it.id }
-        return tour.checkpointIds.mapNotNull { byId[it] }
-    }
-
-    fun startTour(property: Property, tour: Tour?): TourLog {
-        val checkpoints = routeCheckpoints(property, tour)
+    fun startTour(tour: Tour): TourLog {
+        val checkpoints = db.checkpoints(tour.id)
         val log = TourLog(
             id = UUID.randomUUID().toString(),
-            propertyId = property.id,
-            propertyName = property.name,
-            tourId = tour?.id,
-            tourName = tour?.name,
+            propertyId = tour.propertyId,
+            propertyName = tour.propertyName,
+            tourId = tour.id,
+            tourName = tour.name,
             officerId = session.userId ?: "",
             officerName = session.officerName,
             startedAt = TimeFmt.nowIso(),
@@ -179,37 +191,41 @@ class Repository(
         return log
     }
 
-    /** Finds the checkpoint a tapped tag belongs to, by tag serial first and then by the id written on the tag. */
-    fun resolveTag(tagUid: String, ndefCheckpointId: String?): Checkpoint? {
-        db.checkpointByTag(tagUid)?.let { return it }
-        if (ndefCheckpointId != null) return db.checkpoint(ndefCheckpointId)?.takeIf { it.active }
-        return null
-    }
+    /**
+     * Records a tag tap during a tour. [tagName] is the checkpoint name read off the tag, which is
+     * matched against this tour's checklist ignoring case and stray spaces.
+     */
+    fun recordScan(log: TourLog, tagName: String?, tagUid: String): ScanResult {
+        if (tagName.isNullOrBlank()) return ScanResult(ScanOutcome.BLANK, null, log)
+        val match = matchByName(db.logChecklist(log.id), tagName)
+            ?: return ScanResult(ScanOutcome.NOT_ON_TOUR, tagName.trim(), log)
 
-    /** Records a tap during an active tour and returns what happened plus the refreshed log. */
-    fun recordScan(log: TourLog, checkpoint: Checkpoint, tagUid: String): Pair<ScanOutcome, TourLog> {
-        val checklist = db.logChecklist(log.id)
-        if (checklist.none { it.checkpointId == checkpoint.id }) return ScanOutcome.NOT_IN_ROUTE to log
-        val alreadyScanned = db.scans(log.id).any { it.checkpointId == checkpoint.id && !it.isDuplicate }
-        val scan = TourScan(
-            id = UUID.randomUUID().toString(),
-            tourLogId = log.id,
-            checkpointId = checkpoint.id,
-            checkpointName = checkpoint.name,
-            scannedAt = TimeFmt.nowIso(),
-            tagUid = tagUid,
-            isDuplicate = alreadyScanned,
-            synced = false,
+        val alreadyScanned = db.scans(log.id).any { it.checkpointId == match.checkpointId && !it.isDuplicate }
+        db.insertScan(
+            TourScan(
+                id = UUID.randomUUID().toString(),
+                tourLogId = log.id,
+                checkpointId = match.checkpointId,
+                checkpointName = match.name,
+                scannedAt = TimeFmt.nowIso(),
+                tagUid = tagUid,
+                isDuplicate = alreadyScanned,
+                synced = false,
+            )
         )
-        db.insertScan(scan)
         // Recount from the database rather than incrementing, so rapid taps can never drift.
         val scannedCount = db.scans(log.id).filter { !it.isDuplicate }.map { it.checkpointId }.toSet().size
         val updated = (db.log(log.id) ?: log).copy(scannedCheckpoints = scannedCount, synced = false)
         db.updateLog(updated)
         tryPush()
-        return (if (alreadyScanned) ScanOutcome.DUPLICATE else ScanOutcome.SCANNED) to updated
+        return ScanResult(
+            outcome = if (alreadyScanned) ScanOutcome.DUPLICATE else ScanOutcome.SCANNED,
+            checkpointName = match.name,
+            log = updated,
+        )
     }
 
+    /** Ends the tour, whether or not every checkpoint was scanned. */
     fun endTour(log: TourLog): TourLog {
         val scanned = db.scans(log.id).filter { !it.isDuplicate }.map { it.checkpointId }.toSet().size
         val updated = log.copy(
@@ -223,17 +239,53 @@ class Repository(
         return updated
     }
 
-    // ------------------------------------------------------------------ checkpoint setup (managers)
+    // ------------------------------------------------------------------ tag setup (admins)
 
-    fun createCheckpoint(property: Property, name: String): Checkpoint {
-        val nextOrder = (db.checkpoints(property.id).maxOfOrNull { it.sortOrder } ?: 0) + 1
-        val row = JSONObject()
-            .put("property_id", property.id)
-            .put("name", name.trim())
-            .put("sort_order", nextOrder)
-            .put("active", true)
-        val created = api.insert("checkpoints", row).toCheckpoint()
-        db.upsertCheckpoint(created)
+    /**
+     * Records that this checkpoint's name has been written onto a physical tag. The tag serial is
+     * kept for audit and so the setup screen can show which checkpoints still need a tag; matching
+     * during a tour is always by name, never by serial.
+     */
+    fun recordTagWritten(checkpoint: Checkpoint, tagUid: String): Checkpoint {
+        val writtenAt = TimeFmt.nowIso()
+        val rows = api.update(
+            "checkpoints",
+            "id=eq.${SupabaseClient.encode(checkpoint.id)}",
+            JSONObject().put("tag_uid", tagUid).put("tag_written_at", writtenAt),
+        )
+        val updated = if (rows.length() > 0) {
+            rows.getJSONObject(0).toCheckpoint()
+        } else {
+            checkpoint.copy(tagUid = tagUid, tagWrittenAt = writtenAt)
+        }
+        db.upsertCheckpoint(updated)
+        return updated
+    }
+
+    /**
+     * Creates checkpoints on a tour from a list of names, in the order given. The admin portal is
+     * the usual place to do this; the app keeps it so a site can be set up from the field.
+     */
+    fun createCheckpoints(tour: Tour, names: List<String>): List<Checkpoint> {
+        val clean = names.map { it.trim() }.filter { it.isNotEmpty() }
+        if (clean.isEmpty()) return emptyList()
+        val existing = db.checkpoints(tour.id)
+        var nextOrder = (existing.maxOfOrNull { it.sortOrder } ?: 0) + 1
+        val taken = existing.map { normalizeName(it.name) }.toMutableSet()
+        val rows = JSONArray()
+        for (name in clean) {
+            if (!taken.add(normalizeName(name))) continue
+            rows.put(
+                JSONObject()
+                    .put("tour_id", tour.id)
+                    .put("name", name)
+                    .put("sort_order", nextOrder++)
+                    .put("active", true)
+            )
+        }
+        if (rows.length() == 0) return emptyList()
+        val created = api.upsert("checkpoints", rows).mapObjects { it.toCheckpoint() }
+        created.forEach { db.upsertCheckpoint(it) }
         return created
     }
 
@@ -249,38 +301,22 @@ class Repository(
         db.upsertCheckpoint(checkpoint.copy(active = false))
     }
 
-    /** Links an NFC tag serial to a checkpoint. Throws [TagTaken] if the tag belongs to another checkpoint. */
-    fun linkTag(checkpoint: Checkpoint, tagUid: String): Checkpoint {
-        val existing = api.select("checkpoints", "select=id,property_id,name,sort_order,tag_uid,active&tag_uid=eq.${SupabaseClient.encode(tagUid)}&limit=1")
-        if (existing.length() > 0) {
-            val other = existing.getJSONObject(0).toCheckpoint()
-            if (other.id != checkpoint.id) throw TagTaken(other)
-        }
-        val rows = try {
-            api.update("checkpoints", "id=eq.${SupabaseClient.encode(checkpoint.id)}", JSONObject().put("tag_uid", tagUid))
-        } catch (e: SupabaseClient.ApiException) {
-            if (e.isConflict) throw TagTaken(null) else throw e
-        }
-        val updated = if (rows.length() > 0) rows.getJSONObject(0).toCheckpoint() else checkpoint.copy(tagUid = tagUid)
-        db.upsertCheckpoint(updated)
-        return updated
-    }
-
     // ------------------------------------------------------------------ JSON mapping
 
     private fun JSONObject.toProperty() = Property(reqStr("id"), str("name") ?: "(unnamed)", str("address"), str("zone"))
+
+    private fun JSONObject.toCheckpoint() = Checkpoint(
+        id = reqStr("id"),
+        tourId = reqStr("tour_id"),
+        name = str("name") ?: "(unnamed)",
+        sortOrder = int("sort_order"),
+        tagUid = str("tag_uid"),
+        tagWrittenAt = str("tag_written_at"),
+        active = bool("active", true),
+    )
 
     private companion object {
         /** Column names tried, in order, when looking up an account by its Supabase Auth user id. */
         val ACCOUNT_KEY_COLUMNS = listOf("id", "user_id", "auth_user_id")
     }
-
-    private fun JSONObject.toCheckpoint() = Checkpoint(
-        id = reqStr("id"),
-        propertyId = reqStr("property_id"),
-        name = str("name") ?: "(unnamed)",
-        sortOrder = int("sort_order"),
-        tagUid = str("tag_uid"),
-        active = bool("active", true),
-    )
 }

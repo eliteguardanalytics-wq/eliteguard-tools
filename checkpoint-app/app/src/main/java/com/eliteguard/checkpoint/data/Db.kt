@@ -7,10 +7,11 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
 /**
- * Local SQLite store. Reference data (sites, checkpoints, routes) is a cache of the server;
- * tour logs and scans are written here first and uploaded when the phone is online.
+ * Local SQLite store. Sites, tours and checkpoints are a read-only cache of the server so the
+ * app works with no signal; tour logs and scans are written here first and uploaded when the
+ * phone is online.
  */
-class Db(context: Context) : SQLiteOpenHelper(context, "eliteguard_tours.db", null, 1) {
+class Db(context: Context) : SQLiteOpenHelper(context, "eliteguard_tours.db", null, 2) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -18,28 +19,25 @@ class Db(context: Context) : SQLiteOpenHelper(context, "eliteguard_tours.db", nu
                 id TEXT PRIMARY KEY, name TEXT NOT NULL, address TEXT, zone TEXT)"""
         )
         db.execSQL(
-            """CREATE TABLE checkpoints (
-                id TEXT PRIMARY KEY, property_id TEXT NOT NULL, name TEXT NOT NULL,
-                sort_order INTEGER NOT NULL DEFAULT 0, tag_uid TEXT, active INTEGER NOT NULL DEFAULT 1)"""
-        )
-        db.execSQL("CREATE INDEX idx_checkpoints_property ON checkpoints(property_id)")
-        db.execSQL("CREATE INDEX idx_checkpoints_uid ON checkpoints(tag_uid)")
-        db.execSQL(
             """CREATE TABLE tours (
-                id TEXT PRIMARY KEY, property_id TEXT NOT NULL, name TEXT NOT NULL,
-                sort_order INTEGER NOT NULL DEFAULT 0)"""
+                id TEXT PRIMARY KEY, property_id TEXT NOT NULL, property_name TEXT NOT NULL,
+                name TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0)"""
         )
+        db.execSQL("CREATE INDEX idx_tours_property ON tours(property_id)")
         db.execSQL(
-            """CREATE TABLE tour_checkpoints (
-                tour_id TEXT NOT NULL, checkpoint_id TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0,
-                PRIMARY KEY (tour_id, checkpoint_id))"""
+            """CREATE TABLE checkpoints (
+                id TEXT PRIMARY KEY, tour_id TEXT NOT NULL, name TEXT NOT NULL,
+                sort_order INTEGER NOT NULL DEFAULT 0, tag_uid TEXT, tag_written_at TEXT,
+                active INTEGER NOT NULL DEFAULT 1)"""
         )
+        db.execSQL("CREATE INDEX idx_checkpoints_tour ON checkpoints(tour_id)")
         db.execSQL(
             """CREATE TABLE tour_logs (
                 id TEXT PRIMARY KEY, property_id TEXT NOT NULL, property_name TEXT NOT NULL,
-                tour_id TEXT, tour_name TEXT, officer_id TEXT NOT NULL, officer_name TEXT NOT NULL,
-                started_at TEXT NOT NULL, completed_at TEXT, status TEXT NOT NULL,
-                total_checkpoints INTEGER NOT NULL DEFAULT 0, scanned_checkpoints INTEGER NOT NULL DEFAULT 0,
+                tour_id TEXT NOT NULL, tour_name TEXT NOT NULL, officer_id TEXT NOT NULL,
+                officer_name TEXT NOT NULL, started_at TEXT NOT NULL, completed_at TEXT,
+                status TEXT NOT NULL, total_checkpoints INTEGER NOT NULL DEFAULT 0,
+                scanned_checkpoints INTEGER NOT NULL DEFAULT 0,
                 device_id TEXT NOT NULL, synced INTEGER NOT NULL DEFAULT 0)"""
         )
         db.execSQL(
@@ -56,32 +54,46 @@ class Db(context: Context) : SQLiteOpenHelper(context, "eliteguard_tours.db", nu
         db.execSQL("CREATE INDEX idx_scans_log ON tour_scans(tour_log_id)")
     }
 
+    /**
+     * Version 1 hung checkpoints off a site with a tour_checkpoints join table. The reference
+     * tables are only a cache, so they are simply rebuilt in the new shape on the next refresh.
+     * Tour logs and scans are the officer's own work and are carried across untouched.
+     */
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // First schema version; nothing to migrate yet.
+        if (oldVersion < 2) {
+            db.execSQL("DROP TABLE IF EXISTS tour_checkpoints")
+            db.execSQL("DROP TABLE IF EXISTS checkpoints")
+            db.execSQL("DROP TABLE IF EXISTS tours")
+            db.execSQL(
+                """CREATE TABLE tours (
+                    id TEXT PRIMARY KEY, property_id TEXT NOT NULL, property_name TEXT NOT NULL,
+                    name TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0)"""
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_tours_property ON tours(property_id)")
+            db.execSQL(
+                """CREATE TABLE checkpoints (
+                    id TEXT PRIMARY KEY, tour_id TEXT NOT NULL, name TEXT NOT NULL,
+                    sort_order INTEGER NOT NULL DEFAULT 0, tag_uid TEXT, tag_written_at TEXT,
+                    active INTEGER NOT NULL DEFAULT 1)"""
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_checkpoints_tour ON checkpoints(tour_id)")
+            // A v1 log had a nullable tour; give the columns the values v2 requires.
+            db.execSQL("UPDATE tour_logs SET tour_id = COALESCE(tour_id, ''), tour_name = COALESCE(tour_name, 'All checkpoints')")
+        }
     }
 
     // ---------------------------------------------------------------- reference data
 
-    fun replaceReferenceData(properties: List<Property>, checkpoints: List<Checkpoint>, tours: List<Tour>) {
+    fun replaceReferenceData(properties: List<Property>, tours: List<Tour>, checkpoints: List<Checkpoint>) {
         val db = writableDatabase
         db.beginTransaction()
         try {
             db.delete("properties", null, null)
-            db.delete("checkpoints", null, null)
             db.delete("tours", null, null)
-            db.delete("tour_checkpoints", null, null)
+            db.delete("checkpoints", null, null)
             for (p in properties) db.insert("properties", null, p.toValues())
+            for (t in tours) db.insert("tours", null, t.toValues())
             for (c in checkpoints) db.insert("checkpoints", null, c.toValues())
-            for (t in tours) {
-                db.insert("tours", null, ContentValues().apply {
-                    put("id", t.id); put("property_id", t.propertyId); put("name", t.name); put("sort_order", t.sortOrder)
-                })
-                t.checkpointIds.forEachIndexed { index, cpId ->
-                    db.insert("tour_checkpoints", null, ContentValues().apply {
-                        put("tour_id", t.id); put("checkpoint_id", cpId); put("sort_order", index)
-                    })
-                }
-            }
             db.setTransactionSuccessful()
         } finally {
             db.endTransaction()
@@ -93,49 +105,32 @@ class Db(context: Context) : SQLiteOpenHelper(context, "eliteguard_tours.db", nu
             c.list { it.toProperty() }
         }
 
-    fun property(id: String): Property? =
-        readableDatabase.query("properties", null, "id = ?", arrayOf(id), null, null, null).use { c ->
-            if (c.moveToFirst()) c.toProperty() else null
+    /** Every tour, ordered by site then by the order the admin gave them. */
+    fun tours(): List<Tour> =
+        readableDatabase.query(
+            "tours", null, null, null, null, null, "property_name COLLATE NOCASE, sort_order, name COLLATE NOCASE"
+        ).use { c -> c.list { it.toTour() } }
+
+    fun tour(id: String): Tour? =
+        readableDatabase.query("tours", null, "id = ?", arrayOf(id), null, null, null).use { c ->
+            if (c.moveToFirst()) c.toTour() else null
         }
 
-    /** Active checkpoint counts keyed by property id. */
+    /** Active checkpoint counts keyed by tour id. */
     fun checkpointCounts(): Map<String, Int> =
-        readableDatabase.rawQuery("SELECT property_id, COUNT(*) FROM checkpoints WHERE active = 1 GROUP BY property_id", null).use { c ->
+        readableDatabase.rawQuery("SELECT tour_id, COUNT(*) FROM checkpoints WHERE active = 1 GROUP BY tour_id", null).use { c ->
             val out = HashMap<String, Int>()
             while (c.moveToNext()) out[c.getString(0)] = c.getInt(1)
             out
         }
 
-    fun checkpoints(propertyId: String): List<Checkpoint> =
+    fun checkpoints(tourId: String): List<Checkpoint> =
         readableDatabase.query(
-            "checkpoints", null, "property_id = ? AND active = 1", arrayOf(propertyId), null, null, "sort_order, name COLLATE NOCASE"
+            "checkpoints", null, "tour_id = ? AND active = 1", arrayOf(tourId), null, null, "sort_order, name COLLATE NOCASE"
         ).use { c -> c.list { it.toCheckpoint() } }
-
-    fun checkpoint(id: String): Checkpoint? =
-        readableDatabase.query("checkpoints", null, "id = ?", arrayOf(id), null, null, null).use { c ->
-            if (c.moveToFirst()) c.toCheckpoint() else null
-        }
-
-    fun checkpointByTag(tagUid: String): Checkpoint? =
-        readableDatabase.query("checkpoints", null, "tag_uid = ? AND active = 1", arrayOf(tagUid), null, null, null).use { c ->
-            if (c.moveToFirst()) c.toCheckpoint() else null
-        }
 
     fun upsertCheckpoint(checkpoint: Checkpoint) {
         writableDatabase.insertWithOnConflict("checkpoints", null, checkpoint.toValues(), SQLiteDatabase.CONFLICT_REPLACE)
-    }
-
-    fun tours(propertyId: String): List<Tour> {
-        val db = readableDatabase
-        val tours = db.query("tours", null, "property_id = ?", arrayOf(propertyId), null, null, "sort_order, name COLLATE NOCASE").use { c ->
-            c.list { Tour(it.str("id"), it.str("property_id"), it.str("name"), it.int("sort_order"), emptyList()) }
-        }
-        return tours.map { t ->
-            val ids = db.query("tour_checkpoints", arrayOf("checkpoint_id"), "tour_id = ?", arrayOf(t.id), null, null, "sort_order").use { c ->
-                c.list { it.getString(0) }
-            }
-            t.copy(checkpointIds = ids)
-        }
     }
 
     // ---------------------------------------------------------------- tour logs
@@ -165,9 +160,9 @@ class Db(context: Context) : SQLiteOpenHelper(context, "eliteguard_tours.db", nu
             if (c.moveToFirst()) c.toLog() else null
         }
 
-    fun activeLog(propertyId: String): TourLog? =
+    fun activeLogForTour(tourId: String): TourLog? =
         readableDatabase.query(
-            "tour_logs", null, "property_id = ? AND status = ?", arrayOf(propertyId, LogStatus.IN_PROGRESS), null, null, "started_at DESC", "1"
+            "tour_logs", null, "tour_id = ? AND status = ?", arrayOf(tourId, LogStatus.IN_PROGRESS), null, null, "started_at DESC", "1"
         ).use { c -> if (c.moveToFirst()) c.toLog() else null }
 
     fun anyActiveLog(): TourLog? =
@@ -191,6 +186,20 @@ class Db(context: Context) : SQLiteOpenHelper(context, "eliteguard_tours.db", nu
         readableDatabase.query("log_checkpoints", null, "log_id = ?", arrayOf(logId), null, null, "sort_order").use { c ->
             c.list { LogCheckpoint(it.str("log_id"), it.str("checkpoint_id"), it.str("name"), it.int("sort_order")) }
         }
+
+    /**
+     * The officer's live checklist: everything still to do first, in the admin's order, then the
+     * scanned ones at the bottom in the order they were scanned.
+     */
+    fun checklist(logId: String): List<ChecklistRow> {
+        val firstScan = HashMap<String, String>()
+        for (scan in scans(logId)) {
+            if (scan.isDuplicate) continue
+            val existing = firstScan[scan.checkpointId]
+            if (existing == null || scan.scannedAt < existing) firstScan[scan.checkpointId] = scan.scannedAt
+        }
+        return buildChecklist(logChecklist(logId), firstScan)
+    }
 
     // ---------------------------------------------------------------- scans
 
@@ -224,9 +233,14 @@ class Db(context: Context) : SQLiteOpenHelper(context, "eliteguard_tours.db", nu
         put("id", id); put("name", name); put("address", address); put("zone", zone)
     }
 
+    private fun Tour.toValues() = ContentValues().apply {
+        put("id", id); put("property_id", propertyId); put("property_name", propertyName)
+        put("name", name); put("sort_order", sortOrder)
+    }
+
     private fun Checkpoint.toValues() = ContentValues().apply {
-        put("id", id); put("property_id", propertyId); put("name", name); put("sort_order", sortOrder)
-        put("tag_uid", tagUid); put("active", if (active) 1 else 0)
+        put("id", id); put("tour_id", tourId); put("name", name); put("sort_order", sortOrder)
+        put("tag_uid", tagUid); put("tag_written_at", tagWrittenAt); put("active", if (active) 1 else 0)
     }
 
     private fun TourLog.toValues() = ContentValues().apply {
@@ -245,13 +259,15 @@ class Db(context: Context) : SQLiteOpenHelper(context, "eliteguard_tours.db", nu
 
     private fun Cursor.toProperty() = Property(str("id"), str("name"), optStr("address"), optStr("zone"))
 
+    private fun Cursor.toTour() = Tour(str("id"), str("property_id"), str("property_name"), str("name"), int("sort_order"))
+
     private fun Cursor.toCheckpoint() = Checkpoint(
-        str("id"), str("property_id"), str("name"), int("sort_order"), optStr("tag_uid"), int("active") == 1
+        str("id"), str("tour_id"), str("name"), int("sort_order"), optStr("tag_uid"), optStr("tag_written_at"), int("active") == 1
     )
 
     private fun Cursor.toLog() = TourLog(
         id = str("id"), propertyId = str("property_id"), propertyName = str("property_name"),
-        tourId = optStr("tour_id"), tourName = optStr("tour_name"), officerId = str("officer_id"), officerName = str("officer_name"),
+        tourId = str("tour_id"), tourName = str("tour_name"), officerId = str("officer_id"), officerName = str("officer_name"),
         startedAt = str("started_at"), completedAt = optStr("completed_at"), status = str("status"),
         totalCheckpoints = int("total_checkpoints"), scannedCheckpoints = int("scanned_checkpoints"),
         deviceId = str("device_id"), synced = int("synced") == 1

@@ -71,9 +71,9 @@ class LoginActivity : Activity() {
 
     /** Goes to the site list; if launched by tapping a tag mid-tour, lands on the active tour. */
     private fun openApp() {
-        startActivity(Intent(this, SitesActivity::class.java))
+        startActivity(Intent(this, HomeActivity::class.java))
         if (intent?.action == NfcAdapter.ACTION_NDEF_DISCOVERED) {
-            App.get(this).db.anyActiveLog()?.let { startActivity(TourActivity.intent(this, it.propertyId)) }
+            App.get(this).db.anyActiveLog()?.let { startActivity(TourActivity.intent(this, it.tourId)) }
         }
         finish()
     }

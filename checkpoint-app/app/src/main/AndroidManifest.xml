@@ -34,7 +34,8 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".ui.SitesActivity" android:exported="false" />
+        <activity android:name=".ui.HomeActivity" android:exported="false" />
+        <activity android:name=".ui.TourPickerActivity" android:exported="false" />
         <activity android:name=".ui.TourActivity" android:exported="false" android:launchMode="singleTop" />
         <activity android:name=".ui.SetupActivity" android:exported="false" android:launchMode="singleTop" />
         <activity android:name=".ui.HistoryActivity" android:exported="false" />
