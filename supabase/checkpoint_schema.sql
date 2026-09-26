@@ -150,6 +150,42 @@ create table if not exists public.tour_scans (
 
 create index if not exists tour_scans_log_idx on public.tour_scans (tour_log_id, scanned_at);
 
+-- ---------------------------------------------------------------- 5b. reconcile columns
+-- "create table if not exists" leaves an existing table exactly as it is, so a table
+-- created by an older version of this file would never gain the columns added since, and
+-- the reporting view at the end would fail to build. These statements add anything
+-- missing and do nothing at all when the column is already there.
+alter table public.tours add column if not exists description      text;
+alter table public.tours add column if not exists sort_order       integer not null default 0;
+alter table public.tours add column if not exists expected_minutes integer;
+alter table public.tours add column if not exists active           boolean not null default true;
+alter table public.tours add column if not exists created_at       timestamptz not null default now();
+alter table public.tours add column if not exists updated_at       timestamptz not null default now();
+
+alter table public.checkpoints add column if not exists description    text;
+alter table public.checkpoints add column if not exists sort_order     integer not null default 0;
+alter table public.checkpoints add column if not exists tag_uid        text;
+alter table public.checkpoints add column if not exists tag_written_at timestamptz;
+alter table public.checkpoints add column if not exists active         boolean not null default true;
+alter table public.checkpoints add column if not exists created_at     timestamptz not null default now();
+alter table public.checkpoints add column if not exists updated_at     timestamptz not null default now();
+
+alter table public.tour_logs add column if not exists officer_id          uuid;
+alter table public.tour_logs add column if not exists officer_name        text;
+alter table public.tour_logs add column if not exists completed_at        timestamptz;
+alter table public.tour_logs add column if not exists status              text not null default 'in_progress';
+alter table public.tour_logs add column if not exists total_checkpoints   integer not null default 0;
+alter table public.tour_logs add column if not exists scanned_checkpoints integer not null default 0;
+alter table public.tour_logs add column if not exists device_id           text;
+alter table public.tour_logs add column if not exists notes               text;
+alter table public.tour_logs add column if not exists created_at          timestamptz not null default now();
+
+alter table public.tour_scans add column if not exists checkpoint_id   uuid;
+alter table public.tour_scans add column if not exists checkpoint_name text;
+alter table public.tour_scans add column if not exists tag_uid         text;
+alter table public.tour_scans add column if not exists is_duplicate    boolean not null default false;
+alter table public.tour_scans add column if not exists created_at      timestamptz not null default now();
+
 -- ---------------------------------------------------------------- 6. access control
 -- Applied only to the new tables. The existing properties and
 -- incident_portal_accounts tables are left exactly as they are.
@@ -166,48 +202,61 @@ grant select, insert, update         on public.tour_logs   to authenticated;
 grant select, insert, update         on public.tour_scans  to authenticated;
 
 -- Tours and checkpoints: every signed-in officer may read, admins may change.
+--
+-- auth.uid() and is_tour_manager() are wrapped in a sub-select on purpose. Postgres then
+-- evaluates each once per statement instead of once per row, which is what the Supabase
+-- advisor means by an auth RLS initplan warning. It does not change who sees what.
 drop policy if exists "tours read"   on public.tours;
 drop policy if exists "tours manage" on public.tours;
 create policy "tours read"   on public.tours for select to authenticated using (true);
 create policy "tours manage" on public.tours for all    to authenticated
-  using (public.is_tour_manager()) with check (public.is_tour_manager());
+  using ((select public.is_tour_manager())) with check ((select public.is_tour_manager()));
 
 drop policy if exists "checkpoints read"   on public.checkpoints;
 drop policy if exists "checkpoints manage" on public.checkpoints;
 create policy "checkpoints read"   on public.checkpoints for select to authenticated using (true);
 create policy "checkpoints manage" on public.checkpoints for all    to authenticated
-  using (public.is_tour_manager()) with check (public.is_tour_manager());
+  using ((select public.is_tour_manager())) with check ((select public.is_tour_manager()));
 
 -- Tour logs: an officer sees and writes their own, an admin sees all of them.
 drop policy if exists "tour_logs read"   on public.tour_logs;
 drop policy if exists "tour_logs insert" on public.tour_logs;
 drop policy if exists "tour_logs update" on public.tour_logs;
 create policy "tour_logs read"   on public.tour_logs for select to authenticated
-  using (officer_id = auth.uid() or public.is_tour_manager());
+  using (officer_id = (select auth.uid()) or (select public.is_tour_manager()));
 create policy "tour_logs insert" on public.tour_logs for insert to authenticated
-  with check (officer_id = auth.uid());
+  with check (officer_id = (select auth.uid()));
 create policy "tour_logs update" on public.tour_logs for update to authenticated
-  using (officer_id = auth.uid() or public.is_tour_manager())
-  with check (officer_id = auth.uid() or public.is_tour_manager());
+  using (officer_id = (select auth.uid()) or (select public.is_tour_manager()))
+  with check (officer_id = (select auth.uid()) or (select public.is_tour_manager()));
 
 drop policy if exists "tour_scans read"   on public.tour_scans;
 drop policy if exists "tour_scans insert" on public.tour_scans;
 drop policy if exists "tour_scans update" on public.tour_scans;
 create policy "tour_scans read" on public.tour_scans for select to authenticated
   using (exists (select 1 from public.tour_logs l
-                 where l.id = tour_log_id and (l.officer_id = auth.uid() or public.is_tour_manager())));
+                 where l.id = tour_log_id and (l.officer_id = (select auth.uid()) or (select public.is_tour_manager()))));
 create policy "tour_scans insert" on public.tour_scans for insert to authenticated
   with check (exists (select 1 from public.tour_logs l
-                      where l.id = tour_log_id and l.officer_id = auth.uid()));
+                      where l.id = tour_log_id and l.officer_id = (select auth.uid())));
 create policy "tour_scans update" on public.tour_scans for update to authenticated
   using (exists (select 1 from public.tour_logs l
-                 where l.id = tour_log_id and (l.officer_id = auth.uid() or public.is_tour_manager())))
+                 where l.id = tour_log_id and (l.officer_id = (select auth.uid()) or (select public.is_tour_manager()))))
   with check (exists (select 1 from public.tour_logs l
-                      where l.id = tour_log_id and (l.officer_id = auth.uid() or public.is_tour_manager())));
+                      where l.id = tour_log_id and (l.officer_id = (select auth.uid()) or (select public.is_tour_manager()))));
 
 -- ---------------------------------------------------------------- 7. reporting view
 -- One line per walked tour, for the admin portal.
-create or replace view public.tour_log_summary as
+--
+-- security_invoker is essential here, not optional. A Postgres view runs with the
+-- privileges of the account that owns it, which for a view created in the SQL editor is
+-- a superuser, and superusers are exempt from row level security. Without this setting
+-- the view would hand every officer every other officer tour log, straight past the
+-- tour_logs policies below. With it, the view is evaluated as whoever is querying, so
+-- the same policies apply and an officer sees only their own tours while an admin sees
+-- all of them. Requires PostgreSQL 15 or newer, which Supabase has.
+create or replace view public.tour_log_summary
+with (security_invoker = on) as
 select
   l.id,
   l.property_id,

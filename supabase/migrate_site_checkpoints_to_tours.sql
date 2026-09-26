@@ -73,6 +73,12 @@ alter table public.checkpoints drop constraint if exists checkpoints_tag_uid_key
 --    from the app before a scan can match them.
 update public.checkpoints set tag_uid = null where tag_written_at is null;
 
+-- 9. Lock the tours table down until checkpoint_schema.sql adds its policies. Turning
+--    row level security on with no policy yet denies everyone, which is the safe
+--    direction to be in between the two files.
+alter table public.tours enable row level security;
+
 -- ============================================================================
--- Now run checkpoint_schema.sql.
+-- Now run checkpoint_schema.sql, which adds the policies that open these tables
+-- back up to the right people.
 -- ============================================================================

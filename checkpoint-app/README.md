@@ -60,13 +60,18 @@ paste, Run. Both files are plain SQL with no procedural blocks, so any client ca
    and `zone` to `properties`, creates `tours`, `checkpoints`, `tour_logs` and `tour_scans` with
    their row level security policies, and creates the `tour_log_summary` view for the admin
    portal. Re-running it is safe.
-3. Officers need a row in `incident_portal_accounts`. Accounts whose `role` is `admin` can create
+3. Row level security is turned on by the script itself, with policies, on all four tables it
+   creates. You do not need to enable it by hand, and nothing should be left disabled. The
+   `tour_log_summary` view is created with `security_invoker = on`, without which a Postgres view
+   runs as its owner and would show every officer every other officer's tour logs regardless of
+   those policies. Your own `properties` and `incident_portal_accounts` tables are left untouched.
+4. Officers need a row in `incident_portal_accounts`. Accounts whose `role` is `admin` can create
    tours and checkpoints and write tags from the phone; everyone else can walk tours. The
    `is_tour_manager()` function reads that table through `to_jsonb`, so it works whether the row
    is keyed by `id`, `user_id` or `auth_user_id`, and whether `role` is text or an enum.
-4. If the app signs in but lists no tours, the incident project's own policies are blocking reads
+5. If the app signs in but lists no tours, the incident project's own policies are blocking reads
    of `properties`. The bottom of the schema file has the check and a one-line fix.
-5. Create tours and checkpoints in the admin portal, or until it exists from the app's
+6. Create tours and checkpoints in the admin portal, or until it exists from the app's
    **Set Up Tags** screen, or by inserting rows into `tours` and `checkpoints` directly.
 
 ## Building
