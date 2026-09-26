@@ -1,13 +1,26 @@
+-- ############################################################################
+-- STOP. MOST DATABASES DO NOT NEED THIS FILE.
+--
+-- WHICH FILE DO I RUN?
+-- Open Dashboard, Table Editor, and look for a table named checkpoints.
+--
+--   no checkpoints table at all      run checkpoint_schema.sql only
+--   it has a tour_id column          run checkpoint_schema.sql only
+--   it has a property_id column      run migrate_site_checkpoints_to_tours.sql
+--                                    first, then checkpoint_schema.sql
+--
+-- Most databases want checkpoint_schema.sql on its own. The migration file exists
+-- only for a database left over from an earlier version of this schema, and it
+-- fails with "relation public.checkpoints does not exist" if you run it on a
+-- database that never had that older shape. That failure is harmless, nothing is
+-- changed, and you can go straight to checkpoint_schema.sql.
+-- ############################################################################
+
 -- ============================================================================
 -- Elite Guard Tours -- move checkpoints from site-owned to tour-owned
 -- ----------------------------------------------------------------------------
--- RUN THIS ONLY IF you already ran an older version of checkpoint_schema.sql,
--- the one where public.checkpoints had a property_id column.
---
--- To check, look at public.checkpoints in Dashboard, Table Editor. If it has a
--- property_id column, run this file. If it has a tour_id column instead, you are
--- already current and must NOT run this file. If the table does not exist at all,
--- skip this file and run checkpoint_schema.sql on its own.
+-- This file only moves an existing site-owned checkpoints table to being
+-- tour-owned. It is not part of a normal install.
 --
 -- What it does. The hierarchy became site, then tour, then checkpoint. Each site
 -- that has checkpoints gets one tour named Main Tour to hold them, so nothing is

@@ -46,32 +46,43 @@ gets written onto its NFC tag.
 
 ## Backend setup (one time)
 
-Run these in the **incident reporting** Supabase project: Dashboard, SQL Editor, New query,
-paste, Run. Both files are plain SQL with no procedural blocks, so any client can run them.
+Run this in the **incident reporting** Supabase project: Dashboard, SQL Editor, New query,
+paste, Run.
 
-1. **Only if you already ran an older version of the schema**, the one where `checkpoints` had a
-   `property_id` column, run
-   [`../supabase/migrate_site_checkpoints_to_tours.sql`](../supabase/migrate_site_checkpoints_to_tours.sql)
-   first. It moves each site's checkpoints under one tour named "Main Tour", drops the old
-   `tour_checkpoints` table and the old unique constraint on `tag_uid`, and clears the stored tag
-   serials, since every tag now needs its checkpoint name written onto it. Check `checkpoints` in
-   the Table Editor: a `property_id` column means run it, a `tour_id` column means skip it.
-2. Run [`../supabase/checkpoint_schema.sql`](../supabase/checkpoint_schema.sql). It adds `address`
-   and `zone` to `properties`, creates `tours`, `checkpoints`, `tour_logs` and `tour_scans` with
-   their row level security policies, and creates the `tour_log_summary` view for the admin
-   portal. Re-running it is safe.
-3. Row level security is turned on by the script itself, with policies, on all four tables it
+### Which file to run
+
+Open the Table Editor and look for a table named `checkpoints`.
+
+| What you see | What to run |
+| --- | --- |
+| No `checkpoints` table at all | [`checkpoint_schema.sql`](../supabase/checkpoint_schema.sql) only |
+| It has a `tour_id` column | [`checkpoint_schema.sql`](../supabase/checkpoint_schema.sql) only |
+| It has a `property_id` column | [`migrate_site_checkpoints_to_tours.sql`](../supabase/migrate_site_checkpoints_to_tours.sql) first, then [`checkpoint_schema.sql`](../supabase/checkpoint_schema.sql) |
+
+**Almost certainly the first row.** The migration file exists only for a database left over
+from an earlier version of this schema. Running it on a database that never had that older
+shape fails with `relation "public.checkpoints" does not exist`, which is harmless — nothing
+is changed, and you can go straight to `checkpoint_schema.sql`.
+
+`checkpoint_schema.sql` adds `address` and `zone` to `properties`, creates `tours`,
+`checkpoints`, `tour_logs` and `tour_scans` with their row level security policies, and creates
+the `tour_log_summary` view for the admin portal. Re-running it is safe. Both files are plain
+SQL with no procedural blocks, so any client can run them.
+
+### Then
+
+1. Row level security is turned on by the script itself, with policies, on all four tables it
    creates. You do not need to enable it by hand, and nothing should be left disabled. The
    `tour_log_summary` view is created with `security_invoker = on`, without which a Postgres view
    runs as its owner and would show every officer every other officer's tour logs regardless of
    those policies. Your own `properties` and `incident_portal_accounts` tables are left untouched.
-4. Officers need a row in `incident_portal_accounts`. Accounts whose `role` is `admin` can create
+2. Officers need a row in `incident_portal_accounts`. Accounts whose `role` is `admin` can create
    tours and checkpoints and write tags from the phone; everyone else can walk tours. The
    `is_tour_manager()` function reads that table through `to_jsonb`, so it works whether the row
    is keyed by `id`, `user_id` or `auth_user_id`, and whether `role` is text or an enum.
-5. If the app signs in but lists no tours, the incident project's own policies are blocking reads
+3. If the app signs in but lists no tours, the incident project's own policies are blocking reads
    of `properties`. The bottom of the schema file has the check and a one-line fix.
-6. Create tours and checkpoints in the admin portal, or until it exists from the app's
+4. Create tours and checkpoints in the admin portal, or until it exists from the app's
    **Set Up Tags** screen, or by inserting rows into `tours` and `checkpoints` directly.
 
 ## Building

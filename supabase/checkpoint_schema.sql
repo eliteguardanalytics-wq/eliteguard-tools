@@ -1,3 +1,19 @@
+-- ############################################################################
+-- WHICH FILE DO I RUN?
+-- Open Dashboard, Table Editor, and look for a table named checkpoints.
+--
+--   no checkpoints table at all      run checkpoint_schema.sql only
+--   it has a tour_id column          run checkpoint_schema.sql only
+--   it has a property_id column      run migrate_site_checkpoints_to_tours.sql
+--                                    first, then checkpoint_schema.sql
+--
+-- Most databases want checkpoint_schema.sql on its own. The migration file exists
+-- only for a database left over from an earlier version of this schema, and it
+-- fails with "relation public.checkpoints does not exist" if you run it on a
+-- database that never had that older shape. That failure is harmless, nothing is
+-- changed, and you can go straight to checkpoint_schema.sql.
+-- ############################################################################
+
 -- ============================================================================
 -- Elite Guard Tours -- checkpoint and tour schema
 -- ----------------------------------------------------------------------------
@@ -6,10 +22,6 @@
 --
 -- Run this in that project: Dashboard, SQL Editor, New query, paste, Run.
 -- Every statement is idempotent, so it is safe to run more than once.
---
--- IF YOU PREVIOUSLY RAN AN OLDER VERSION of this file, the one where a
--- checkpoint belonged to a site and had a property_id column, run
--- migrate_site_checkpoints_to_tours.sql FIRST, then come back and run this.
 --
 -- It expects two tables that already exist in that project:
 --   public.properties                 uuid id, name              the client sites
