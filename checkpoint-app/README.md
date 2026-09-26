@@ -46,20 +46,26 @@ gets written onto its NFC tag.
 
 ## Backend setup (one time)
 
-1. Open the **incident reporting** Supabase project and run
-   [`../supabase/checkpoint_schema.sql`](../supabase/checkpoint_schema.sql) in the SQL editor.
-   It adds `address` and `zone` columns to `properties`, creates `checkpoints`, `tours`,
-   `tour_checkpoints`, `tour_logs` and `tour_scans` with their row level security policies,
-   and creates a `tour_log_summary` view for the admin portal. Re-running it is safe. If you ran
-   an earlier version of this file, where checkpoints hung off a site, it migrates them under one
-   "Main Tour" per site and clears the old tag serials, since those tags now need the name
-   written onto them.
-2. Watch for the notice it prints: `is_tour_manager() will match incident_portal_accounts.<col>
-   against auth.uid()`. That confirms it found how your accounts table links to Supabase Auth.
-3. Officers need a row in `incident_portal_accounts`. Accounts whose `role` is `admin` can set up
-   checkpoints and enrol tags from the phone; everyone else can run tours.
-4. If the app signs in but lists no sites, the incident project's own policies are blocking reads
-   of `properties`. The bottom of the SQL file has the check and the one-line fix.
+Run these in the **incident reporting** Supabase project: Dashboard, SQL Editor, New query,
+paste, Run. Both files are plain SQL with no procedural blocks, so any client can run them.
+
+1. **Only if you already ran an older version of the schema**, the one where `checkpoints` had a
+   `property_id` column, run
+   [`../supabase/migrate_site_checkpoints_to_tours.sql`](../supabase/migrate_site_checkpoints_to_tours.sql)
+   first. It moves each site's checkpoints under one tour named "Main Tour", drops the old
+   `tour_checkpoints` table and the old unique constraint on `tag_uid`, and clears the stored tag
+   serials, since every tag now needs its checkpoint name written onto it. Check `checkpoints` in
+   the Table Editor: a `property_id` column means run it, a `tour_id` column means skip it.
+2. Run [`../supabase/checkpoint_schema.sql`](../supabase/checkpoint_schema.sql). It adds `address`
+   and `zone` to `properties`, creates `tours`, `checkpoints`, `tour_logs` and `tour_scans` with
+   their row level security policies, and creates the `tour_log_summary` view for the admin
+   portal. Re-running it is safe.
+3. Officers need a row in `incident_portal_accounts`. Accounts whose `role` is `admin` can create
+   tours and checkpoints and write tags from the phone; everyone else can walk tours. The
+   `is_tour_manager()` function reads that table through `to_jsonb`, so it works whether the row
+   is keyed by `id`, `user_id` or `auth_user_id`, and whether `role` is text or an enum.
+4. If the app signs in but lists no tours, the incident project's own policies are blocking reads
+   of `properties`. The bottom of the schema file has the check and a one-line fix.
 5. Create tours and checkpoints in the admin portal, or until it exists from the app's
    **Set Up Tags** screen, or by inserting rows into `tours` and `checkpoints` directly.
 

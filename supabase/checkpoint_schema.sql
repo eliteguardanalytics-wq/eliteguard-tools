@@ -1,148 +1,70 @@
 -- ============================================================================
--- Elite Guard Tours – checkpoint / tour schema
+-- Elite Guard Tours -- checkpoint and tour schema
 -- ----------------------------------------------------------------------------
 -- Target: the Elite Guard INCIDENT REPORTING Supabase project
---         (https://fmfcfepwindmioiowvfe.supabase.co)
+--         https://fmfcfepwindmioiowvfe.supabase.co
 --
--- Run this once in that project: Dashboard -> SQL Editor -> New query -> Run.
--- Every statement is idempotent, so it is safe to re-run.
+-- Run this in that project: Dashboard, SQL Editor, New query, paste, Run.
+-- Every statement is idempotent, so it is safe to run more than once.
+--
+-- IF YOU PREVIOUSLY RAN AN OLDER VERSION of this file, the one where a
+-- checkpoint belonged to a site and had a property_id column, run
+-- migrate_site_checkpoints_to_tours.sql FIRST, then come back and run this.
 --
 -- It expects two tables that already exist in that project:
---   public.properties                (uuid id, name)          -- the client sites
---   public.incident_portal_accounts  (role, keyed to auth)    -- the portal logins
+--   public.properties                 uuid id, name              the client sites
+--   public.incident_portal_accounts   a role column, keyed to auth
 --
--- It ADDS: address and zone columns on properties, plus four new tables
--- (tours, checkpoints, tour_logs, tour_scans), their row level security policies,
--- and a reporting view. Nothing existing is dropped or altered beyond the two new
--- nullable columns on properties.
+-- It ADDS address and zone columns on properties, four new tables
+-- (tours, checkpoints, tour_logs, tour_scans), their row level security
+-- policies, and a reporting view. Nothing existing is dropped or altered
+-- beyond the two new nullable columns on properties.
 --
--- The hierarchy is site -> tour -> checkpoint. A checkpoint's NAME is what gets written
--- onto its NFC tag and what a scan is matched against.
+-- The hierarchy is site, then tour, then checkpoint. The NAME of a checkpoint
+-- is what gets written onto its NFC tag and what a scan is matched against.
+--
+-- Every statement below is plain SQL. There are no DO blocks, no dynamic SQL,
+-- and no semicolons or apostrophes inside comments, so any SQL client can run
+-- the file whether or not it splits the script up before sending it.
 -- ============================================================================
 
 create extension if not exists pgcrypto;
 
 -- ---------------------------------------------------------------- 1. properties
--- The app shows a site's address and zone under its name. Both are optional.
+-- The app shows the address and zone of a site under its name. Both are optional.
 alter table public.properties add column if not exists address text;
 alter table public.properties add column if not exists zone    text;
 
--- ---------------------------------------------------------------- 2. helpers
-create or replace function public.set_updated_at()
-returns trigger language plpgsql as $$
-begin
-  new.updated_at = now();
-  return new;
-end $$;
-
--- True when the signed-in account may manage checkpoints and enrol NFC tags.
+-- ---------------------------------------------------------------- 2. who may manage tours
+-- True when the signed-in account may create tours and checkpoints and write NFC tags.
 --
--- The accounts table is keyed to Supabase Auth by one of id / user_id / auth_user_id.
--- This block finds which one and builds the function around it, so the function is
--- static (and fast) afterwards. To change who may enrol tags, edit the role list on
--- the marked line below and re-run this block.
-do $do$
-declare
-  key_col text;
-begin
-  select c.column_name into key_col
-  from information_schema.columns c
-  where c.table_schema = 'public'
-    and c.table_name   = 'incident_portal_accounts'
-    and c.column_name in ('id', 'user_id', 'auth_user_id')
-    and c.data_type    = 'uuid'
-  order by array_position(array['id', 'user_id', 'auth_user_id'], c.column_name)
-  limit 1;
-
-  if key_col is null then
-    raise exception
-      'No uuid column named id, user_id or auth_user_id found on public.incident_portal_accounts. Create public.is_tour_manager() by hand.';
-  end if;
-
-  raise notice 'is_tour_manager() will match incident_portal_accounts.% against auth.uid()', key_col;
-
-  execute format($fmt$
-    create or replace function public.is_tour_manager()
-    returns boolean language sql stable security definer
-    set search_path = public
-    as $body$
-      select exists (
-        select 1
-        from public.incident_portal_accounts a
-        where a.%I = auth.uid()
-          and lower(a.role::text) = any (array['admin'])   -- <<< roles allowed to enrol tags
-      );
-    $body$;
-  $fmt$, key_col);
-end
-$do$;
-
--- ---------------------------------------------------------------- 2b. migration
--- An earlier version of this file hung checkpoints off a site, with a tour_checkpoints
--- join table. This moves such a schema to site -> tour -> checkpoint: each site that has
--- checkpoints gets one tour to hold them, so nothing is lost. It is skipped entirely on a
--- fresh install and on a schema that is already current.
-do $mig$
-declare
-  moved integer;
-begin
-  if not exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public' and table_name = 'checkpoints' and column_name = 'property_id'
-  ) then
-    return;   -- nothing to migrate
-  end if;
-
-  raise notice 'Migrating checkpoints from site-owned to tour-owned...';
-
-  create table if not exists public.tours (
-    id               uuid primary key default gen_random_uuid(),
-    property_id      uuid not null references public.properties(id) on delete cascade,
-    name             text not null,
-    description      text,
-    sort_order       integer not null default 0,
-    expected_minutes integer,
-    active           boolean not null default true,
-    created_at       timestamptz not null default now(),
-    updated_at       timestamptz not null default now()
-  );
-
-  -- One holding tour per site that has checkpoints, unless that site already has one.
-  insert into public.tours (property_id, name, sort_order)
-  select distinct c.property_id, 'Main Tour', 0
-  from public.checkpoints c
-  where not exists (select 1 from public.tours t where t.property_id = c.property_id);
-
-  alter table public.checkpoints add column if not exists tour_id uuid references public.tours(id) on delete cascade;
-  alter table public.checkpoints add column if not exists tag_written_at timestamptz;
-
-  update public.checkpoints c
-  set tour_id = t.id
-  from public.tours t
-  where c.tour_id is null
-    and t.property_id = c.property_id
-    and t.sort_order = 0;
-
-  select count(*) into moved from public.checkpoints where tour_id is not null;
-  raise notice '  % checkpoints now belong to a tour', moved;
-
-  -- A tag that was already enrolled was matched by serial; the name now lives on the tag,
-  -- so those tags must be re-written from the app. Clear the serial to show that.
-  update public.checkpoints set tag_uid = null where tag_written_at is null;
-
-  alter table public.checkpoints alter column tour_id set not null;
-  alter table public.checkpoints drop column property_id;
-  drop index if exists public.checkpoints_property_idx;
-  drop table if exists public.tour_checkpoints;
-
-  -- tour_id is required from here on; a log without one cannot be represented.
-  delete from public.tour_logs where tour_id is null;
-end
-$mig$;
+-- The accounts table is read through to_jsonb so this works no matter which column
+-- links it to Supabase Auth. A missing key reads as null rather than failing, so all
+-- three spellings can be checked at once and no column has to exist.
+--
+-- To change who may manage tours, edit the role list on the marked line and re-run.
+create or replace function public.is_tour_manager()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.incident_portal_accounts a
+    where lower(coalesce(to_jsonb(a) ->> 'role', '')) = any (array['admin'])
+      and auth.uid()::text = any (array[
+        to_jsonb(a) ->> 'id',
+        to_jsonb(a) ->> 'user_id',
+        to_jsonb(a) ->> 'auth_user_id'
+      ])
+  )
+$$;
 
 -- ---------------------------------------------------------------- 3. tours
--- A named patrol route at a site. The admin portal creates these under a site, then adds
--- the tour's checkpoints.
+-- A named patrol route at a site. The admin portal creates these under a site,
+-- then adds the checkpoints that belong to each one.
 create table if not exists public.tours (
   id               uuid primary key default gen_random_uuid(),
   property_id      uuid not null references public.properties(id) on delete cascade,
@@ -154,22 +76,18 @@ create table if not exists public.tours (
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
 );
+
 create index if not exists tours_property_idx on public.tours (property_id, sort_order);
 
-drop trigger if exists tours_set_updated_at on public.tours;
-create trigger tours_set_updated_at
-  before update on public.tours
-  for each row execute function public.set_updated_at();
-
 -- ---------------------------------------------------------------- 4. checkpoints
--- A named checkpoint on one tour. The NAME is the identity: an admin writes it onto an NFC
--- tag from the phone, and a scan during a tour is matched by comparing the name read off the
--- tag against this tour's checkpoints.
+-- A named checkpoint on one tour. The NAME is the identity. An admin writes it onto
+-- an NFC tag from the phone, and a scan during a tour is matched by comparing the
+-- name read off the tag against the checkpoints of that tour.
 --
--- tag_uid and tag_written_at record the last tag a name was written to. They are informational
--- only -- matching never depends on them -- and let the app show which checkpoints still need
--- a tag. They are deliberately NOT unique: one physical tag reading "Front Gate" can serve the
--- "Front Gate" checkpoint on several tours.
+-- tag_uid and tag_written_at record the last tag a name was written to. They are
+-- informational only, matching never depends on them, and they let the app show which
+-- checkpoints still need a tag. They are deliberately NOT unique, because one physical
+-- tag reading Front Gate can serve the Front Gate checkpoint on several tours.
 create table if not exists public.checkpoints (
   id             uuid primary key default gen_random_uuid(),
   tour_id        uuid not null references public.tours(id) on delete cascade,
@@ -182,26 +100,21 @@ create table if not exists public.checkpoints (
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now()
 );
+
 create index if not exists checkpoints_tour_idx on public.checkpoints (tour_id, sort_order);
 
--- Names must be unambiguous within a tour, because a scan is matched by name. The comparison
--- ignores case and collapsed whitespace, exactly as the app's matching does.
+-- Names must be unambiguous within a tour, because a scan is matched by name. The
+-- comparison ignores case and collapsed whitespace, exactly as the app does it.
 create unique index if not exists checkpoints_tour_name_idx
   on public.checkpoints (tour_id, lower(regexp_replace(btrim(name), '\s+', ' ', 'g')))
   where active;
 
-drop trigger if exists checkpoints_set_updated_at on public.checkpoints;
-create trigger checkpoints_set_updated_at
-  before update on public.checkpoints
-  for each row execute function public.set_updated_at();
-
 -- ---------------------------------------------------------------- 5. tour logs
--- One row per tour an officer performs. Ids are generated on the phone so an
--- offline tour can be uploaded later without duplicates.
+-- One row per tour walked by one officer. Ids are generated on the phone so a tour
+-- walked offline can be uploaded later without duplicates.
 --
--- officer_id holds auth.uid() and deliberately carries no foreign key, so this
--- schema does not depend on how incident_portal_accounts is keyed. Join it to
--- that table on whichever column is_tour_manager() reported above.
+-- officer_id holds auth.uid() and deliberately carries no foreign key, so this schema
+-- does not depend on how incident_portal_accounts is keyed.
 create table if not exists public.tour_logs (
   id                  uuid primary key,
   property_id         uuid not null references public.properties(id) on delete restrict,
@@ -218,11 +131,12 @@ create table if not exists public.tour_logs (
   notes               text,
   created_at          timestamptz not null default now()
 );
+
 create index if not exists tour_logs_property_started_idx on public.tour_logs (property_id, started_at desc);
 create index if not exists tour_logs_officer_idx on public.tour_logs (officer_id, started_at desc);
 
--- One row per tag tap. Repeated taps of the same checkpoint are kept with
--- is_duplicate = true so the portal can show them without counting them.
+-- One row per tag tap. A repeated tap of the same checkpoint is kept with
+-- is_duplicate set to true, so the portal can show it without counting it.
 create table if not exists public.tour_scans (
   id              uuid primary key,
   tour_log_id     uuid not null references public.tour_logs(id) on delete cascade,
@@ -233,37 +147,38 @@ create table if not exists public.tour_scans (
   is_duplicate    boolean not null default false,
   created_at      timestamptz not null default now()
 );
+
 create index if not exists tour_scans_log_idx on public.tour_scans (tour_log_id, scanned_at);
 
--- ---------------------------------------------------------------- 6. row level security
+-- ---------------------------------------------------------------- 6. access control
 -- Applied only to the new tables. The existing properties and
 -- incident_portal_accounts tables are left exactly as they are.
-alter table public.checkpoints      enable row level security;
-alter table public.tours            enable row level security;
-alter table public.tour_logs        enable row level security;
-alter table public.tour_scans       enable row level security;
+alter table public.tours       enable row level security;
+alter table public.checkpoints enable row level security;
+alter table public.tour_logs   enable row level security;
+alter table public.tour_scans  enable row level security;
 
--- Supabase grants these automatically to new tables in public, but granting explicitly
--- means the app works even if that project default was ever changed.
-grant select                       on public.checkpoints, public.tours to authenticated;
-grant insert, update               on public.checkpoints, public.tours to authenticated;
-grant delete                       on public.checkpoints, public.tours to authenticated;
-grant select, insert, update       on public.tour_logs, public.tour_scans                       to authenticated;
+-- Supabase grants these to new tables in public automatically. Granting explicitly
+-- means the app still works if that project default was ever changed.
+grant select, insert, update, delete on public.tours       to authenticated;
+grant select, insert, update, delete on public.checkpoints to authenticated;
+grant select, insert, update         on public.tour_logs   to authenticated;
+grant select, insert, update         on public.tour_scans  to authenticated;
 
--- Reference data: every signed-in officer can read; admins can change.
-drop policy if exists "checkpoints read"   on public.checkpoints;
-drop policy if exists "checkpoints manage" on public.checkpoints;
-create policy "checkpoints read"   on public.checkpoints for select to authenticated using (true);
-create policy "checkpoints manage" on public.checkpoints for all    to authenticated
-  using (public.is_tour_manager()) with check (public.is_tour_manager());
-
+-- Tours and checkpoints: every signed-in officer may read, admins may change.
 drop policy if exists "tours read"   on public.tours;
 drop policy if exists "tours manage" on public.tours;
 create policy "tours read"   on public.tours for select to authenticated using (true);
 create policy "tours manage" on public.tours for all    to authenticated
   using (public.is_tour_manager()) with check (public.is_tour_manager());
 
--- Tour logs: officers see and write their own; admins see everything.
+drop policy if exists "checkpoints read"   on public.checkpoints;
+drop policy if exists "checkpoints manage" on public.checkpoints;
+create policy "checkpoints read"   on public.checkpoints for select to authenticated using (true);
+create policy "checkpoints manage" on public.checkpoints for all    to authenticated
+  using (public.is_tour_manager()) with check (public.is_tour_manager());
+
+-- Tour logs: an officer sees and writes their own, an admin sees all of them.
 drop policy if exists "tour_logs read"   on public.tour_logs;
 drop policy if exists "tour_logs insert" on public.tour_logs;
 drop policy if exists "tour_logs update" on public.tour_logs;
@@ -291,7 +206,7 @@ create policy "tour_scans update" on public.tour_scans for update to authenticat
                       where l.id = tour_log_id and (l.officer_id = auth.uid() or public.is_tour_manager())));
 
 -- ---------------------------------------------------------------- 7. reporting view
--- One line per tour, for the future admin portal.
+-- One line per walked tour, for the admin portal.
 create or replace view public.tour_log_summary as
 select
   l.id,
@@ -313,20 +228,27 @@ left join public.tours t on t.id = l.tour_id;
 
 grant select on public.tour_log_summary to authenticated;
 
+-- ---------------------------------------------------------------- 8. clean-up
+-- An older version of this file installed a trigger to maintain updated_at. The
+-- column remains and is set when a row is created. Nothing in the app reads it, so
+-- the trigger and its function are removed rather than kept as plpgsql, which some
+-- SQL clients mis-parse. A portal that wants the column current can set
+-- updated_at = now() in its own update statements.
+drop trigger if exists tours_set_updated_at       on public.tours;
+drop trigger if exists checkpoints_set_updated_at on public.checkpoints;
+drop function if exists public.set_updated_at();
+
 -- ============================================================================
 -- IF THE APP SHOWS AN EMPTY SITE LIST
 -- ----------------------------------------------------------------------------
--- The incident project's own policies decide whether a signed-in officer may read
+-- The policies of the incident project decide whether a signed-in officer may read
 -- public.properties. If row level security is on there with no read policy for
--- authenticated users, the app will sign in but list no sites. Check with:
+-- authenticated users, the app signs in but lists no tours. Check the policies on
+-- public.properties in Dashboard, Authentication, Policies.
 --
---   select relrowsecurity from pg_class where oid = 'public.properties'::regclass;
---   select policyname, cmd, roles from pg_policies
---    where schemaname = 'public' and tablename = 'properties';
+-- If a read policy is missing, the line below adds one. It is commented out on
+-- purpose, because it widens who can read the site list of the incident project.
+-- Remove the two dashes to enable it.
 --
--- If a read policy is missing, this adds one. It is left commented out on purpose:
--- it widens who can read the incident project's site list, so enable it knowingly.
---
---   create policy "properties read" on public.properties
---     for select to authenticated using (true);
+-- create policy "properties read" on public.properties for select to authenticated using (true)
 -- ============================================================================
