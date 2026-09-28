@@ -2,6 +2,7 @@ package com.eliteguard.checkpoint.data
 
 import com.eliteguard.checkpoint.Config
 import com.eliteguard.checkpoint.net.SupabaseClient
+import com.eliteguard.checkpoint.net.TenantConfig
 import com.eliteguard.checkpoint.util.TimeFmt
 import com.eliteguard.checkpoint.util.bool
 import com.eliteguard.checkpoint.util.int
@@ -24,10 +25,20 @@ class Repository(
     val db: Db,
     private val api: SupabaseClient,
     private val session: Session,
+    private val device: Device,
     private val deviceId: String,
 ) {
 
     class ProfileMissing : IOException("No account for this login")
+
+    /** The phone has not been enrolled against a site yet. */
+    class NotEnrolled : IOException("This device is not assigned to a site")
+
+    /** The licence key did not match the portal host it was entered with. */
+    class LicenseRejected : IOException("Licence key not recognised for that portal")
+
+    /** The site this phone was activated against. */
+    data class EnrolledSite(val propertyId: String, val propertyName: String, val backendFromHost: Boolean)
 
     /** What a tag tap meant. */
     enum class ScanOutcome {
@@ -51,6 +62,54 @@ class Repository(
         val log: TourLog,
     )
 
+    // ------------------------------------------------------------------ enrolment
+
+    /**
+     * Ties this phone to one site. Resolves the portal host to a backend, asks that backend
+     * whether the licence key belongs to the host, and only stores anything once it says yes.
+     *
+     * Done once per phone. Signing out does not undo it.
+     */
+    fun enrol(typedHost: String, typedLicense: String): EnrolledSite {
+        val host = Device.normalizeHost(typedHost) ?: throw LicenseRejected()
+        val license = Device.normalizeLicense(typedLicense)
+        if (license.isEmpty()) throw LicenseRejected()
+
+        val backend = TenantConfig.resolve(host)
+        val row = api.verifyLicense(backend.url, backend.anonKey, license, host) ?: throw LicenseRejected()
+        val propertyId = row.str("property_id") ?: throw LicenseRejected()
+        val propertyName = row.str("property_name") ?: "(unnamed site)"
+
+        // Anything cached from a previous enrolment belongs to a different site.
+        db.replaceReferenceData(emptyList(), emptyList(), emptyList())
+        device.enrol(host, license, propertyId, propertyName, backend.url, backend.anonKey)
+        return EnrolledSite(propertyId, propertyName, backend.fromHost)
+    }
+
+    /**
+     * Tells the server this phone exists, so the portal can list the devices at a site. Best
+     * effort and attempted once: nothing in the app depends on it succeeding.
+     */
+    private fun registerDeviceOnce() {
+        if (device.registered) return
+        val propertyId = device.propertyId ?: return
+        try {
+            // A function, not a direct insert: an officer may register a device but only an admin
+            // may read the fleet, and an upsert would need to read the row it conflicts with.
+            api.rpc(
+                "register_device",
+                JSONObject()
+                    .put("p_device_id", deviceId)
+                    .put("p_property_id", propertyId)
+                    .put("p_portal_host", device.portalHost ?: JSONObject.NULL)
+                    .put("p_app_version", Config.VERSION_NAME),
+            )
+            device.registered = true
+        } catch (e: Exception) {
+            // The portal simply will not list this phone yet.
+        }
+    }
+
     // ------------------------------------------------------------------ auth
 
     fun signIn(username: String, password: String) {
@@ -67,6 +126,7 @@ class Repository(
             displayName = account.firstValue(Config.DISPLAY_NAME_COLUMNS),
             role = account.str("role"),
         )
+        registerDeviceOnce()
     }
 
     fun signOut() {
@@ -99,26 +159,40 @@ class Repository(
 
     // ------------------------------------------------------------------ sync
 
-    /** Downloads sites, tours and checkpoints and replaces the local cache. */
+    /**
+     * Downloads the enrolled site, its tours and their checkpoints, and replaces the local cache.
+     * Everything is filtered to the one site this phone belongs to, so a phone can never show
+     * another site even if the account behind it can see more.
+     */
     fun refreshReferenceData() {
+        val propertyId = device.propertyId ?: throw NotEnrolled()
+        val encodedProperty = SupabaseClient.encode(propertyId)
         // Selected with "*" so the app still works if the site table has no address or zone column.
-        val properties = api.select(Config.PROPERTIES_TABLE, "select=*&order=name").mapObjects { it.toProperty() }
-        val siteNames = properties.associate { it.id to it.name }
-        val tours = api.select("tours", "select=id,property_id,name,sort_order&active=eq.true&order=sort_order,name")
+        val properties = api.select(Config.PROPERTIES_TABLE, "select=*&id=eq.$encodedProperty")
+            .mapObjects { it.toProperty() }
+        val siteName = properties.firstOrNull()?.name ?: device.siteName
+        val tours = api
+            .select("tours", "select=id,property_id,name,sort_order&active=eq.true&property_id=eq.$encodedProperty&order=sort_order,name")
             .mapObjects { row ->
-                val propertyId = row.reqStr("property_id")
                 Tour(
                     id = row.reqStr("id"),
-                    propertyId = propertyId,
-                    propertyName = siteNames[propertyId] ?: "(unknown site)",
+                    propertyId = row.reqStr("property_id"),
+                    propertyName = siteName,
                     name = row.str("name") ?: "(unnamed tour)",
                     sortOrder = row.int("sort_order"),
                 )
             }
-        val checkpoints = api
-            .select("checkpoints", "select=id,tour_id,name,sort_order,tag_uid,tag_written_at,active&active=eq.true&order=sort_order,name")
-            .mapObjects { it.toCheckpoint() }
+        val checkpoints = if (tours.isEmpty()) {
+            emptyList()
+        } else {
+            val ids = tours.joinToString(",") { SupabaseClient.encode(it.id) }
+            api.select(
+                "checkpoints",
+                "select=id,tour_id,name,sort_order,tag_uid,tag_written_at,active&active=eq.true&tour_id=in.($ids)&order=sort_order,name",
+            ).mapObjects { it.toCheckpoint() }
+        }
         db.replaceReferenceData(properties, tours, checkpoints)
+        registerDeviceOnce()
     }
 
     /**
@@ -261,6 +335,32 @@ class Repository(
         db.upsertCheckpoint(updated)
         return updated
     }
+
+    /** Creates a tour at the site this phone is enrolled against. */
+    fun createTour(name: String): Tour {
+        val propertyId = device.propertyId ?: throw NotEnrolled()
+        val nextOrder = (db.tours().maxOfOrNull { it.sortOrder } ?: 0) + 1
+        val row = JSONObject()
+            .put("property_id", propertyId)
+            .put("name", name.trim())
+            .put("sort_order", nextOrder)
+            .put("active", true)
+        val created = api.insert("tours", row)
+        val tour = Tour(
+            id = created.reqStr("id"),
+            propertyId = propertyId,
+            propertyName = device.siteName,
+            name = created.str("name") ?: name.trim(),
+            sortOrder = created.int("sort_order", nextOrder),
+        )
+        db.upsertTour(tour)
+        return tour
+    }
+
+    /** Creates one checkpoint on a tour and returns it, ready for its tag to be programmed. */
+    fun createCheckpoint(tour: Tour, name: String): Checkpoint =
+        createCheckpoints(tour, listOf(name)).firstOrNull()
+            ?: throw IOException("A checkpoint named \"${name.trim()}\" is already on this tour")
 
     /**
      * Creates checkpoints on a tour from a list of names, in the order given. The admin portal is

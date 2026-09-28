@@ -18,6 +18,15 @@
         android:paddingBottom="16dp">
 
         <TextView
+            android:id="@+id/site_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/brass"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.06" />
+
+        <TextView
             android:id="@+id/officer_name"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

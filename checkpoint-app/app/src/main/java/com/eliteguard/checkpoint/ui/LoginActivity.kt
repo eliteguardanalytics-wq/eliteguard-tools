@@ -23,6 +23,12 @@ class LoginActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!App.get(this).device.isEnrolled) {
+            // A phone has to belong to a site before anyone can sign in to it.
+            startActivity(Intent(this, EnrolActivity::class.java))
+            finish()
+            return
+        }
         if (App.get(this).session.isLoggedIn) {
             openApp()
             return
@@ -33,6 +39,7 @@ class LoginActivity : Activity() {
         error = findViewById(R.id.error)
         signIn = findViewById(R.id.sign_in)
         findViewById<TextView>(R.id.version).text = "v${Config.VERSION_NAME}"
+        findViewById<TextView>(R.id.site).text = App.get(this).device.siteName
 
         signIn.setOnClickListener { attemptSignIn() }
         password.setOnEditorActionListener { _, actionId, _ ->

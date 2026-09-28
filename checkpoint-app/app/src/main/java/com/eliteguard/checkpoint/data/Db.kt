@@ -129,6 +129,10 @@ class Db(context: Context) : SQLiteOpenHelper(context, "eliteguard_tours.db", nu
             "checkpoints", null, "tour_id = ? AND active = 1", arrayOf(tourId), null, null, "sort_order, name COLLATE NOCASE"
         ).use { c -> c.list { it.toCheckpoint() } }
 
+    fun upsertTour(tour: Tour) {
+        writableDatabase.insertWithOnConflict("tours", null, tour.toValues(), SQLiteDatabase.CONFLICT_REPLACE)
+    }
+
     fun upsertCheckpoint(checkpoint: Checkpoint) {
         writableDatabase.insertWithOnConflict("checkpoints", null, checkpoint.toValues(), SQLiteDatabase.CONFLICT_REPLACE)
     }

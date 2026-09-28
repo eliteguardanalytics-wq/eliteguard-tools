@@ -13,14 +13,40 @@ adds its own checkpoint and tour-log tables alongside the incident data.
 The hierarchy is **site → tour → checkpoint**. A checkpoint is a name, and that name is what
 gets written onto its NFC tag.
 
-1. In the admin portal an administrator creates a site, adds tours to it, and adds checkpoint
-   names to each tour (one at a time or in bulk). Names only — no tags involved.
-2. An administrator signs into this app, picks a tour, selects a checkpoint name, and holds a
-   blank tag to the phone. The name is written onto the tag and stays there until an
-   administrator writes something else onto it.
-3. An officer signs in, presses **Start Tour**, picks a tour, and walks it. Each tag tap turns
-   that checkpoint green and drops it to the bottom of the list, so what is still outstanding
-   stays at the top. **End Tour** finishes the tour whether or not everything was scanned.
+### One-time device activation
+
+A phone belongs to one site, decided before anyone signs in.
+
+1. The portal issues a **site licence** for a site — a row in `site_licenses` carrying the key and
+   the portal host it is valid for. The key defaults to 16 random hex characters; print it in
+   groups of four if that is easier to type.
+2. On first launch the app asks for the **portal address** (`eliteguard.siloam.one`, or
+   `xyzsecurity.siloam.one` for another tenant) and that licence.
+3. The app resolves the address to a backend, checks the licence against it, and stores the site.
+   From then on the phone only ever sees that one site. Signing out does not undo it; an admin can
+   reassign the phone from the home menu.
+
+The address decides which Supabase project the app talks to. A host may publish
+`https://<host>/app-config.json` holding `supabase_url` and `supabase_anon_key`, which is what
+lets a second tenant work without a new build. When that file is absent, as it is for Elite Guard
+today, the app falls back to the project compiled into `Config.kt`. The licence is still checked
+against whichever backend was resolved, and a key is only accepted for the host it was issued
+for, so a licence cannot be used against another tenant.
+
+### Then, per person
+
+A guard signs in and gets Start Tour. An admin signs in and additionally gets **Set Up Tags**,
+scoped to the phone's site, with three things on it:
+
+- **Create New Tour** — names a patrol route at this site.
+- **Program Existing Tag** — pick the tour, pick the checkpoint, confirm, hold the tag.
+- **Add New Tag** — pick the tour, type the name, press Program Tag, hold the tag. The checkpoint
+  is created when the button is pressed, so a failed write leaves a named checkpoint to retry
+  rather than losing the name.
+
+An officer then presses **Start Tour**, picks a tour, and walks it. Each tag tap turns that
+checkpoint green and drops it to the bottom of the list. **End Tour** finishes whether or not
+everything was scanned.
 
 ## What the app does
 
@@ -82,8 +108,24 @@ SQL with no procedural blocks, so any client can run them.
    is keyed by `id`, `user_id` or `auth_user_id`, and whether `role` is text or an enum.
 3. If the app signs in but lists no tours, the incident project's own policies are blocking reads
    of `properties`. The bottom of the schema file has the check and a one-line fix.
-4. Create tours and checkpoints in the admin portal, or until it exists from the app's
-   **Set Up Tags** screen, or by inserting rows into `tours` and `checkpoints` directly.
+4. Issue a licence for each site so its phones can be activated:
+
+   ```sql
+   insert into public.site_licenses (property_id, portal_host, label)
+   select id, 'eliteguard.siloam.one', 'Ocean Place phones'
+   from public.properties where name = 'Ocean Place'
+   returning license_key;
+   ```
+
+   The returned key is what the installer types. `site_licenses` is readable only by an admin,
+   and enrolment goes through `verify_site_license()`, which is the one function an
+   unauthenticated app may call. It answers with a site name only when the key matches the host
+   it was issued for, so a guessed key reveals nothing more than that, and signing in is still
+   required to see or change anything.
+5. Enrolled phones appear in `site_devices`, written by `register_device()` after a successful
+   sign-in. Only an admin can read that table.
+6. Create tours and checkpoints in the admin portal, or from the app's **Set Up Tags** screen, or
+   by inserting rows into `tours` and `checkpoints` directly.
 
 ## Building
 
@@ -128,12 +170,17 @@ checkpoint-app/
                                 plus the checklist ordering and name-matching rules
     data/Db.kt                  SQLite cache + offline queue
     data/Session.kt             sign-in tokens and officer profile
+    data/Device.kt              which site this phone belongs to, set once
+    net/TenantConfig.kt         resolves a portal host to a backend
     data/Repository.kt          sync, tour start/scan/end, checkpoint setup
     net/SupabaseClient.kt       tiny Supabase auth + PostgREST client
     nfc/NfcTags.kt              tag serial, NDEF read/write helpers
+    ui/EnrolActivity.kt         one-time activation against a site licence
     ui/LoginActivity.kt         sign in
     ui/HomeActivity.kt          Start Tour, sync status, refresh
-    ui/TourPickerActivity.kt    tours grouped by site
+    ui/SetupMenuActivity.kt     the three admin options
+    ui/AddTagActivity.kt        name a checkpoint and program its tag
+    ui/TourPickerActivity.kt    this site tours
     ui/TourActivity.kt          the officer's checklist + NFC reader mode
     ui/SetupActivity.kt         write checkpoint names onto tags
     ui/HistoryActivity.kt       tours recorded on this phone
@@ -198,7 +245,10 @@ red-green colourblind officer.
 ## Next steps (not in this app)
 
 - **Web admin portal** at `eliteguard.siloam.one`: a site list, add/edit tours per site, and
-  add checkpoints per tour with a bulk-add box (names only). Plus tour log review, for which the
+  add checkpoints per tour with a bulk-add box (names only). Issuing and revoking site licences,
+  and a view of enrolled phones from `site_devices`. Plus tour log review, for which the
   `tour_log_summary` view and `tour_scans` table are ready.
+- **`app-config.json` on each tenant host**, once a second tenant exists, so a single build can
+  serve all of them.
 - Optional GPS capture per scan and photo/incident notes at a checkpoint.
 - Scheduled tour compliance reporting (expected vs. actual tours per shift).

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+    <Toolbar android:id="@+id/toolbar" style="@style/Toolbar" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:background="@color/ink" android:orientation="vertical"
+        android:paddingStart="@dimen/screen_padding" android:paddingEnd="@dimen/screen_padding" android:paddingBottom="14dp">
+        <TextView android:id="@+id/summary" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="@color/on_ink" android:textSize="14sp" android:textStyle="bold" />
+    </LinearLayout>
+    <ScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:padding="@dimen/screen_padding">
+            <Button android:id="@+id/create_tour" style="@style/SecondaryButton" android:text="@string/setup_create_tour" />
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="4dp" android:layout_marginBottom="14dp" android:text="@string/setup_create_tour_note"
+                android:textColor="@color/text_secondary" android:textSize="12sp" />
+            <Button android:id="@+id/program_existing" style="@style/PrimaryButton" android:text="@string/setup_program_existing" />
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="4dp" android:layout_marginBottom="14dp" android:text="@string/setup_program_existing_note"
+                android:textColor="@color/text_secondary" android:textSize="12sp" />
+            <Button android:id="@+id/add_new" style="@style/PrimaryButton" android:text="@string/setup_add_new" />
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="4dp" android:text="@string/setup_add_new_note"
+                android:textColor="@color/text_secondary" android:textSize="12sp" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

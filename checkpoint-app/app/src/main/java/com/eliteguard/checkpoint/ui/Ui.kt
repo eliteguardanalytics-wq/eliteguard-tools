@@ -26,6 +26,7 @@ fun Context.toast(message: CharSequence, long: Boolean = false) {
 fun Context.describe(error: Throwable): String = when (error) {
     is SupabaseClient.InvalidCredentials -> getString(R.string.login_invalid)
     is Repository.ProfileMissing -> getString(R.string.login_no_profile)
+    is Repository.NotEnrolled -> getString(R.string.not_enrolled)
     is SupabaseClient.AuthException -> getString(R.string.session_expired)
     is SupabaseClient.ApiException -> getString(R.string.error_generic, error.message ?: "HTTP ${error.status}")
     is IOException -> getString(R.string.login_network)

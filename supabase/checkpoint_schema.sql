@@ -198,13 +198,98 @@ alter table public.tour_scans add column if not exists tag_uid         text;
 alter table public.tour_scans add column if not exists is_duplicate    boolean not null default false;
 alter table public.tour_scans add column if not exists created_at      timestamptz not null default now();
 
+-- ---------------------------------------------------------------- 5c. device enrolment
+-- A phone is tied to one site before anyone signs in. The portal issues a licence key per
+-- site, and the installer types the portal host and that key once. From then on the phone
+-- only ever sees that site.
+create table if not exists public.site_licenses (
+  id          uuid primary key default gen_random_uuid(),
+  property_id uuid not null references public.properties(id) on delete cascade,
+  -- Printed for a human to type. Stored however you like, since the check below ignores
+  -- case and any dashes or spaces. 16 hex characters is 64 bits, which is far too much to
+  -- guess, and the default generates one for you.
+  license_key text not null unique default upper(encode(gen_random_bytes(8), 'hex')),
+  -- The host the installer types, for example eliteguard.siloam.one. Checked together with
+  -- the key, so a key issued for one tenant cannot enrol a phone pointed at another.
+  portal_host text not null,
+  label       text,
+  active      boolean not null default true,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists site_licenses_property_idx on public.site_licenses (property_id);
+
+-- One row per enrolled phone, so the portal can see which devices belong to which site.
+-- Written by the app after a successful sign-in, not during enrolment.
+create table if not exists public.site_devices (
+  device_id    text primary key,
+  property_id  uuid not null references public.properties(id) on delete cascade,
+  portal_host  text,
+  app_version  text,
+  enrolled_at  timestamptz not null default now(),
+  last_seen_at timestamptz not null default now()
+);
+
+create index if not exists site_devices_property_idx on public.site_devices (property_id);
+
+-- How a phone records itself. Done through a function rather than a direct insert for two
+-- reasons. An upsert is ON CONFLICT DO UPDATE underneath, which needs to read the conflicting
+-- row, so a caller allowed to write but not read would be refused. And this way the table needs
+-- no insert or update grant at all: the only write path is this one function, and reading the
+-- fleet stays an admin matter.
+create or replace function public.register_device(
+  p_device_id   text,
+  p_property_id uuid,
+  p_portal_host text,
+  p_app_version text
+)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  insert into public.site_devices (device_id, property_id, portal_host, app_version, last_seen_at)
+  values (p_device_id, p_property_id, p_portal_host, p_app_version, now())
+  on conflict (device_id) do update
+    set property_id  = excluded.property_id,
+        portal_host  = excluded.portal_host,
+        app_version  = excluded.app_version,
+        last_seen_at = now()
+$$;
+
+-- The one thing an unauthenticated app may ask: does this licence key belong to this host,
+-- and if so which site is it. Nothing else about the licence is exposed, and the table
+-- itself is never readable without a login, so the worst a guessed key reveals is a site
+-- name. Signing in is still required to see or write anything.
+--
+-- Comparison ignores case and any dashes or spaces, so the key can be printed in groups
+-- of four and typed however is convenient.
+create or replace function public.verify_site_license(p_license_key text, p_portal_host text)
+returns table (property_id uuid, property_name text)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select l.property_id, p.name
+  from public.site_licenses l
+  join public.properties p on p.id = l.property_id
+  where l.active
+    and upper(regexp_replace(coalesce(p_license_key, ''), '[^0-9A-Za-z]', '', 'g'))
+      = upper(regexp_replace(l.license_key, '[^0-9A-Za-z]', '', 'g'))
+    and lower(btrim(coalesce(p_portal_host, ''))) = lower(btrim(l.portal_host))
+  limit 1
+$$;
+
 -- ---------------------------------------------------------------- 6. access control
 -- Applied only to the new tables. The existing properties and
 -- incident_portal_accounts tables are left exactly as they are.
 alter table public.tours       enable row level security;
 alter table public.checkpoints enable row level security;
-alter table public.tour_logs   enable row level security;
-alter table public.tour_scans  enable row level security;
+alter table public.tour_logs     enable row level security;
+alter table public.tour_scans    enable row level security;
+alter table public.site_licenses enable row level security;
+alter table public.site_devices  enable row level security;
 
 -- Supabase grants these to new tables in public automatically. Granting explicitly
 -- means the app still works if that project default was ever changed.
@@ -212,6 +297,26 @@ grant select, insert, update, delete on public.tours       to authenticated;
 grant select, insert, update, delete on public.checkpoints to authenticated;
 grant select, insert, update         on public.tour_logs   to authenticated;
 grant select, insert, update         on public.tour_scans  to authenticated;
+grant select, insert, update, delete on public.site_licenses to authenticated;
+-- Read only. The one write path is register_device below, which runs as owner.
+grant select                         on public.site_devices  to authenticated;
+
+-- Function privileges have to be revoked before they are granted. PostgreSQL gives EXECUTE on
+-- a new function to PUBLIC by default, and on Supabase anon is part of PUBLIC, so granting to
+-- authenticated alone would leave the function open to anyone holding the publishable key.
+revoke all on function public.is_tour_manager() from public;
+revoke all on function public.verify_site_license(text, text) from public;
+revoke all on function public.register_device(text, uuid, text, text) from public;
+
+-- Enrolment happens before anyone signs in, so this one is deliberately callable by anon. It
+-- returns only a site id and name for a key that matches its host, and the tables behind it
+-- stay unreadable without a login.
+grant execute on function public.verify_site_license(text, text) to anon, authenticated;
+
+-- These two need a signed-in account. Policies call is_tour_manager as the querying user, so
+-- authenticated must be able to execute it.
+grant execute on function public.is_tour_manager() to authenticated;
+grant execute on function public.register_device(text, uuid, text, text) to authenticated;
 
 -- Tours and checkpoints: every signed-in officer may read, admins may change.
 --
@@ -229,6 +334,20 @@ drop policy if exists "checkpoints manage" on public.checkpoints;
 create policy "checkpoints read"   on public.checkpoints for select to authenticated using (true);
 create policy "checkpoints manage" on public.checkpoints for all    to authenticated
   using ((select public.is_tour_manager())) with check ((select public.is_tour_manager()));
+
+-- Licences and devices: only an admin may read or change them. Enrolment does not read
+-- these tables directly, it goes through verify_site_license above.
+drop policy if exists "site_licenses manage" on public.site_licenses;
+create policy "site_licenses manage" on public.site_licenses for all to authenticated
+  using ((select public.is_tour_manager())) with check ((select public.is_tour_manager()));
+
+-- Only an admin may read the fleet. There is no write policy because there is no direct write
+-- path: register_device above runs as owner and is the only way a row gets there.
+drop policy if exists "site_devices read"   on public.site_devices;
+drop policy if exists "site_devices write"  on public.site_devices;
+drop policy if exists "site_devices update" on public.site_devices;
+create policy "site_devices read" on public.site_devices for select to authenticated
+  using ((select public.is_tour_manager()));
 
 -- Tour logs: an officer sees and writes their own, an admin sees all of them.
 drop policy if exists "tour_logs read"   on public.tour_logs;

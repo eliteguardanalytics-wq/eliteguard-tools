@@ -1,6 +1,7 @@
 package com.eliteguard.checkpoint.net
 
 import com.eliteguard.checkpoint.Config
+import com.eliteguard.checkpoint.data.Device
 import com.eliteguard.checkpoint.data.Session
 import com.eliteguard.checkpoint.util.reqStr
 import com.eliteguard.checkpoint.util.str
@@ -15,7 +16,13 @@ import java.net.URLEncoder
  * Minimal Supabase client (GoTrue auth + PostgREST) built on HttpURLConnection so the app has
  * no third-party dependencies. All methods are blocking and must be called off the main thread.
  */
-class SupabaseClient(private val session: Session) {
+class SupabaseClient(private val session: Session, private val device: Device) {
+
+    /** Base URL of the backend this phone was enrolled against. */
+    private val baseUrl: String get() = device.backendUrl
+
+    /** Publishable key of that backend. */
+    private val anonKey: String get() = device.backendKey
 
     /** The server answered with an HTTP error. */
     class ApiException(val status: Int, val body: String) : IOException("HTTP $status: ${summarize(body)}") {
@@ -57,7 +64,7 @@ class SupabaseClient(private val session: Session) {
     private fun passwordGrant(email: String, password: String): String {
         val body = JSONObject().put("email", email).put("password", password)
         return try {
-            http("POST", "${Config.SUPABASE_URL}/auth/v1/token?grant_type=password", body.toString(), bearer = null, prefer = null)
+            http("POST", "$baseUrl/auth/v1/token?grant_type=password", body.toString(), bearer = null, prefer = null)
         } catch (e: ApiException) {
             if (e.status == 400 || e.status == 401) throw InvalidCredentials()
             throw e
@@ -69,7 +76,7 @@ class SupabaseClient(private val session: Session) {
         session.clear()
         if (token != null) {
             try {
-                http("POST", "${Config.SUPABASE_URL}/auth/v1/logout", "", bearer = token, prefer = null)
+                http("POST", "$baseUrl/auth/v1/logout", "", bearer = token, prefer = null)
             } catch (e: IOException) {
                 // Best effort; the local session is gone regardless.
             }
@@ -82,7 +89,7 @@ class SupabaseClient(private val session: Session) {
         val refresh = session.refreshToken ?: return false
         return try {
             val body = JSONObject().put("refresh_token", refresh)
-            val response = http("POST", "${Config.SUPABASE_URL}/auth/v1/token?grant_type=refresh_token", body.toString(), bearer = null, prefer = null)
+            val response = http("POST", "$baseUrl/auth/v1/token?grant_type=refresh_token", body.toString(), bearer = null, prefer = null)
             storeTokens(JSONObject(response))
             true
         } catch (e: ApiException) {
@@ -100,6 +107,25 @@ class SupabaseClient(private val session: Session) {
         )
     }
 
+    // ------------------------------------------------------------------ enrolment
+
+    /**
+     * Asks a backend whether [licenseKey] belongs to [portalHost], before anybody has signed in.
+     * The backend is passed in rather than read from the device, because enrolment is what
+     * decides which backend the device will use.
+     *
+     * Returns the site as `property_id` and `property_name`, or null when the key does not match.
+     */
+    fun verifyLicense(backendUrl: String, backendKey: String, licenseKey: String, portalHost: String): JSONObject? {
+        val body = JSONObject().put("p_license_key", licenseKey).put("p_portal_host", portalHost)
+        val response = http(
+            "POST", "$backendUrl/rest/v1/rpc/verify_site_license", body.toString(),
+            bearer = backendKey, prefer = null, key = backendKey,
+        )
+        val rows = JSONArray(response)
+        return if (rows.length() == 0) null else rows.getJSONObject(0)
+    }
+
     // ------------------------------------------------------------------ PostgREST
 
     /** `query` is a raw PostgREST query string, e.g. `select=*&property_id=eq.123&order=name`. */
@@ -112,11 +138,15 @@ class SupabaseClient(private val session: Session) {
     fun upsert(table: String, rows: JSONArray): JSONArray =
         JSONArray(rest("POST", table, "", rows.toString(), "resolution=merge-duplicates,return=representation"))
 
+    /** Calls a database function as the signed-in officer. */
+    fun rpc(function: String, body: JSONObject): String =
+        authed("POST", "$baseUrl/rest/v1/rpc/$function", body.toString(), prefer = null)
+
     fun update(table: String, filter: String, changes: JSONObject): JSONArray =
         JSONArray(rest("PATCH", table, filter, changes.toString(), "return=representation"))
 
     private fun rest(method: String, table: String, query: String, body: String?, prefer: String?): String {
-        val url = "${Config.SUPABASE_URL}/rest/v1/$table" + if (query.isNotEmpty()) "?$query" else ""
+        val url = "$baseUrl/rest/v1/$table" + if (query.isNotEmpty()) "?$query" else ""
         return authed(method, url, body, prefer)
     }
 
@@ -136,14 +166,15 @@ class SupabaseClient(private val session: Session) {
 
     // ------------------------------------------------------------------ HTTP
 
-    private fun http(method: String, url: String, body: String?, bearer: String?, prefer: String?): String {
+    private fun http(method: String, url: String, body: String?, bearer: String?, prefer: String?, key: String? = null): String {
+        val apiKey = key ?: anonKey
         val connection = URI.create(url).toURL().openConnection() as HttpURLConnection
         try {
             connection.requestMethod = method
             connection.connectTimeout = CONNECT_TIMEOUT_MS
             connection.readTimeout = READ_TIMEOUT_MS
-            connection.setRequestProperty("apikey", Config.SUPABASE_ANON_KEY)
-            connection.setRequestProperty("Authorization", "Bearer ${bearer ?: Config.SUPABASE_ANON_KEY}")
+            connection.setRequestProperty("apikey", apiKey)
+            connection.setRequestProperty("Authorization", "Bearer ${bearer ?: apiKey}")
             connection.setRequestProperty("Accept", "application/json")
             connection.setRequestProperty("X-Client-Info", "eliteguard-tours-android/${Config.VERSION_NAME}")
             if (prefer != null) connection.setRequestProperty("Prefer", prefer)

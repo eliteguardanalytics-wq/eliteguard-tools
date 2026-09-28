@@ -50,15 +50,16 @@ class HomeActivity : Activity() {
         startTour = findViewById(R.id.start_tour)
         setupTags = findViewById(R.id.setup_tags)
 
+        findViewById<TextView>(R.id.site_name).text = app.device.siteName
         startTour.setOnClickListener {
             val running = activeTourId
             if (running != null) {
                 startActivity(TourActivity.intent(this, running))
             } else {
-                startActivity(TourPickerActivity.intent(this, forSetup = false))
+                startActivity(TourPickerActivity.intent(this, TourPickerActivity.Mode.RUN))
             }
         }
-        setupTags.setOnClickListener { startActivity(TourPickerActivity.intent(this, forSetup = true)) }
+        setupTags.setOnClickListener { startActivity(Intent(this, SetupMenuActivity::class.java)) }
         setupTags.visibility = if (app.session.canManageCheckpoints) View.VISIBLE else View.GONE
         nfcBanner.setOnClickListener { startActivity(Intent(Settings.ACTION_NFC_SETTINGS)) }
     }
@@ -72,6 +73,8 @@ class HomeActivity : Activity() {
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.menu_home, menu)
+        // Moving a phone to another site is an administrator action, and a rare one.
+        menu.findItem(R.id.action_reset_device)?.isVisible = app.session.canManageCheckpoints
         return true
     }
 
@@ -84,6 +87,9 @@ class HomeActivity : Activity() {
         }
         R.id.action_logout -> {
             confirmLogout(); true
+        }
+        R.id.action_reset_device -> {
+            confirmResetDevice(); true
         }
         else -> super.onOptionsItemSelected(item)
     }
@@ -154,6 +160,34 @@ class HomeActivity : Activity() {
                 nfcBanner.visibility = View.VISIBLE
             }
             else -> nfcBanner.visibility = View.GONE
+        }
+    }
+
+    /**
+     * Unassigns the phone from its site. Everything local goes with it, including anything not
+     * yet uploaded, because those records belong to the old site.
+     */
+    private fun confirmResetDevice() {
+        val pending = app.db.pendingCount()
+        val body = if (pending > 0) {
+            getString(R.string.reset_device_pending, app.device.siteName, pending)
+        } else {
+            getString(R.string.reset_device_message, app.device.siteName)
+        }
+        confirm(getString(R.string.reset_device_title), body, getString(R.string.reset_device_confirm)) {
+            val repo = app.repo
+            Bg.run({
+                runCatching { repo.pushPending() }
+                runCatching { repo.signOut() }
+                app.db.replaceReferenceData(emptyList(), emptyList(), emptyList())
+                app.device.reset()
+            }) {
+                startActivity(
+                    Intent(this, EnrolActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                )
+                finish()
+            }
         }
     }
 

@@ -29,33 +29,44 @@ class TourPickerActivity : Activity() {
         data class TourRow(val tour: Tour, val checkpointCount: Int, val inProgress: Boolean) : Row()
     }
 
+    /** Why the picker is open, which decides where a chosen tour leads. */
+    enum class Mode { RUN, PROGRAM_EXISTING, ADD_NEW }
+
     private val app by lazy { App.get(this) }
-    private var forSetup = false
+    private lateinit var mode: Mode
     private var rows: List<Row> = emptyList()
     private val adapter = TourAdapter()
     private lateinit var empty: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        forSetup = intent.getBooleanExtra(EXTRA_FOR_SETUP, false)
-        if (forSetup && !app.session.canManageCheckpoints) {
+        mode = runCatching { Mode.valueOf(intent.getStringExtra(EXTRA_MODE) ?: Mode.RUN.name) }.getOrDefault(Mode.RUN)
+        if (mode != Mode.RUN && !app.session.canManageCheckpoints) {
             finish()
             return
         }
         setContentView(R.layout.activity_tour_picker)
-        val title = if (forSetup) R.string.picker_setup_title else R.string.picker_run_title
-        setupToolbar(findViewById<Toolbar>(R.id.toolbar), getString(title), showUp = true)
-        findViewById<TextView>(R.id.hint).setText(if (forSetup) R.string.picker_setup_hint else R.string.picker_run_hint)
+        setupToolbar(findViewById<Toolbar>(R.id.toolbar), getString(R.string.picker_title), showUp = true)
+        actionBar?.subtitle = app.device.siteName
+        findViewById<TextView>(R.id.hint).setText(
+            when (mode) {
+                Mode.RUN -> R.string.picker_run_hint
+                Mode.PROGRAM_EXISTING -> R.string.picker_program_hint
+                Mode.ADD_NEW -> R.string.picker_add_hint
+            }
+        )
         empty = findViewById(R.id.empty)
         val list = findViewById<ListView>(R.id.list)
         list.adapter = adapter
         list.setOnItemClickListener { _, _, position, _ ->
             val row = rows.getOrNull(position) as? Row.TourRow ?: return@setOnItemClickListener
-            if (forSetup) {
-                startActivity(SetupActivity.intent(this, row.tour.id))
-            } else {
-                startActivity(TourActivity.intent(this, row.tour.id))
-            }
+            startActivity(
+                when (mode) {
+                    Mode.RUN -> TourActivity.intent(this, row.tour.id)
+                    Mode.PROGRAM_EXISTING -> SetupActivity.intent(this, row.tour.id)
+                    Mode.ADD_NEW -> AddTagActivity.intent(this, row.tour.id)
+                }
+            )
         }
     }
 
@@ -79,16 +90,9 @@ class TourPickerActivity : Activity() {
             val tours = db.tours()
             val counts = db.checkpointCounts()
             val running = tours.filter { db.activeLogForTour(it.id) != null }.map { it.id }.toSet()
-            val out = ArrayList<Row>()
-            var currentSite: String? = null
-            for (tour in tours) {
-                if (tour.propertyName != currentSite) {
-                    currentSite = tour.propertyName
-                    out.add(Row.SiteHeader(tour.propertyName))
-                }
-                out.add(Row.TourRow(tour, counts[tour.id] ?: 0, tour.id in running))
-            }
-            out
+            // This phone is enrolled to one site, so the site name lives in the subtitle and the
+            // list is just that site tours.
+            tours.map { Row.TourRow(it, counts[it.id] ?: 0, it.id in running) }
         }) { result ->
             result.onSuccess {
                 rows = it
@@ -133,9 +137,9 @@ class TourPickerActivity : Activity() {
     }
 
     companion object {
-        private const val EXTRA_FOR_SETUP = "for_setup"
+        private const val EXTRA_MODE = "mode"
 
-        fun intent(context: Context, forSetup: Boolean): Intent =
-            Intent(context, TourPickerActivity::class.java).putExtra(EXTRA_FOR_SETUP, forSetup)
+        fun intent(context: Context, mode: Mode): Intent =
+            Intent(context, TourPickerActivity::class.java).putExtra(EXTRA_MODE, mode.name)
     }
 }

@@ -34,7 +34,10 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".ui.EnrolActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ui.HomeActivity" android:exported="false" />
+        <activity android:name=".ui.SetupMenuActivity" android:exported="false" />
+        <activity android:name=".ui.AddTagActivity" android:exported="false" android:launchMode="singleTop" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ui.TourPickerActivity" android:exported="false" />
         <activity android:name=".ui.TourActivity" android:exported="false" android:launchMode="singleTop" />
         <activity android:name=".ui.SetupActivity" android:exported="false" android:launchMode="singleTop" />

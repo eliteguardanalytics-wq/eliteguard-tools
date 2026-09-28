@@ -49,7 +49,7 @@
         android:layout_marginEnd="@dimen/screen_padding"
         android:background="@drawable/bg_banner_warning"
         android:padding="14dp"
-        android:text="@string/setup_hint"
+        android:text="@string/setup_pick_hint"
         android:textColor="@color/accent_text"
         android:textSize="14sp" />
 

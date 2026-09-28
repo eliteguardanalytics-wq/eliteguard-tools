@@ -9,7 +9,6 @@ import android.nfc.Tag
 import android.os.Bundle
 import android.provider.Settings
 import android.view.LayoutInflater
-import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
@@ -103,17 +102,9 @@ class SetupActivity : Activity() {
         if (::tour.isInitialized) nfc?.disableReaderMode(this)
     }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.menu_setup, menu)
-        return true
-    }
-
     override fun onOptionsItemSelected(item: MenuItem): Boolean = when (item.itemId) {
         android.R.id.home -> {
             finish(); true
-        }
-        R.id.action_add -> {
-            promptNames(null); true
         }
         else -> super.onOptionsItemSelected(item)
     }
@@ -134,17 +125,36 @@ class SetupActivity : Activity() {
     private fun render() {
         val current = selected
         hint.text = if (current == null) {
-            getString(R.string.setup_hint)
+            getString(R.string.setup_pick_hint)
         } else {
             getString(R.string.setup_selected_hint, current.name)
         }
+        hint.setBackgroundResource(if (current == null) R.drawable.bg_banner_warning else R.drawable.bg_banner_success)
+        hint.setTextColor(getColor(if (current == null) R.color.accent_text else R.color.success))
         progressText.text = getString(R.string.setup_progress, checkpoints.count { it.hasTag }, checkpoints.size)
     }
 
+    /**
+     * Arming the writer is a deliberate two-step: choose the checkpoint, confirm, then tap. A
+     * stray tap on a list row must never silently rewrite a tag that is already in service.
+     */
     private fun select(checkpoint: Checkpoint) {
-        selected = if (selected?.id == checkpoint.id) null else checkpoint
-        adapter.notifyDataSetChanged()
-        render()
+        if (selected?.id == checkpoint.id) {
+            selected = null
+            adapter.notifyDataSetChanged()
+            render()
+            return
+        }
+        val message = if (checkpoint.hasTag) {
+            getString(R.string.setup_confirm_again, checkpoint.name)
+        } else {
+            getString(R.string.setup_confirm_new, checkpoint.name)
+        }
+        confirm(getString(R.string.setup_confirm_title), message, getString(R.string.setup_confirm_yes)) {
+            selected = checkpoint
+            adapter.notifyDataSetChanged()
+            render()
+        }
     }
 
     private fun showOptions(checkpoint: Checkpoint) {

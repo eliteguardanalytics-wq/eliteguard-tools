@@ -2,6 +2,21 @@
 <resources>
     <string name="app_name">Elite Guard Tours</string>
 
+    <!-- Device enrolment -->
+    <string name="enrol_title">Activate This Phone</string>
+    <string name="enrol_subtitle">Enter your portal address and the site licence issued for it. This is only needed once.</string>
+    <string name="enrol_host_label">Portal address</string>
+    <string name="enrol_host_hint">eliteguard.siloam.one</string>
+    <string name="enrol_license_label">Site licence</string>
+    <string name="enrol_license_hint">XXXX-XXXX-XXXX-XXXX</string>
+    <string name="enrol_activate">Activate</string>
+    <string name="enrol_checking">Checking licence…</string>
+    <string name="enrol_missing">Enter the portal address and the site licence.</string>
+    <string name="enrol_rejected">That licence is not valid for this portal address. Check both and try again.</string>
+    <string name="enrol_done">This phone is now assigned to %1$s.</string>
+    <string name="enrol_footnote">Dashes and spaces in the licence do not matter, and capitals are not required.</string>
+    <string name="not_enrolled">This phone is not assigned to a site yet.</string>
+
     <!-- Login -->
     <string name="login_title">Officer Sign In</string>
     <string name="login_subtitle">Use the same username and password as the Elite Guard incident reporting portal.</string>
@@ -24,6 +39,11 @@
     <string name="home_active_tour">%1$s · %2$s in progress</string>
     <string name="home_pending_sync">%1$d records waiting to upload</string>
     <string name="home_all_synced">All tour logs uploaded</string>
+    <string name="menu_reset_device">Reassign this phone</string>
+    <string name="reset_device_title">Reassign this phone?</string>
+    <string name="reset_device_message">This phone is assigned to %1$s. Reassigning signs you out and clears everything saved for that site, so the phone can be activated against another one.</string>
+    <string name="reset_device_pending">This phone is assigned to %1$s and %2$d records have not uploaded yet. The app will try to upload them first, but anything left will be lost. Continue?</string>
+    <string name="reset_device_confirm">Reassign</string>
     <string name="home_no_tours">No tours have been set up yet. An administrator adds them in the admin portal.</string>
     <string name="home_refreshing">Refreshing tours and checkpoints…</string>
     <string name="home_refreshed">Tours and checkpoints updated.</string>
@@ -40,10 +60,10 @@
     <string name="session_expired">Your session has expired. Please sign in again.</string>
 
     <!-- Tour picker -->
-    <string name="picker_run_title">Select a Tour</string>
-    <string name="picker_setup_title">Select a Tour</string>
+    <string name="picker_title">Select a Tour</string>
     <string name="picker_run_hint">Choose the tour you are about to walk.</string>
-    <string name="picker_setup_hint">Choose the tour whose tags you want to set up.</string>
+    <string name="picker_program_hint">Choose the tour holding the checkpoint you want to program.</string>
+    <string name="picker_add_hint">Choose the tour to add the new checkpoint to.</string>
     <string name="picker_empty">No tours have been set up yet.</string>
     <string name="picker_checkpoint_count">%1$d checkpoints</string>
     <string name="picker_in_progress">In progress</string>
@@ -75,7 +95,35 @@
 
     <!-- Tag setup -->
     <string name="setup_title">Set Up Tags</string>
-    <string name="setup_hint">Select a checkpoint, then hold a tag against the phone to write its name onto the tag.</string>
+    <string name="setup_menu_summary">%1$d tours · %2$d checkpoints</string>
+    <string name="setup_create_tour">Create New Tour</string>
+    <string name="setup_create_tour_note">Adds a patrol route at this site. Add its checkpoints afterwards.</string>
+    <string name="setup_program_existing">Program Existing Tag</string>
+    <string name="setup_program_existing_note">Write a tag for a checkpoint that already exists.</string>
+    <string name="setup_add_new">Add New Tag</string>
+    <string name="setup_add_new_note">Name a new checkpoint and program its tag in one go.</string>
+
+    <string name="tour_new_title">New tour</string>
+    <string name="tour_new_hint">Name the patrol route at %1$s.</string>
+    <string name="tour_new_save">Create</string>
+    <string name="tour_new_missing">Enter a tour name.</string>
+    <string name="tour_new_done">Tour \"%1$s\" created.</string>
+
+    <string name="setup_pick_hint">Select the checkpoint whose tag you want to program.</string>
+    <string name="setup_confirm_title">Program this tag?</string>
+    <string name="setup_confirm_new">Write \"%1$s\" onto a tag. You will hold the tag to the phone next.</string>
+    <string name="setup_confirm_again">\"%1$s\" already has a tag. Program another one for it?</string>
+    <string name="setup_confirm_yes">Program</string>
+
+    <string name="add_tag_title">Add New Tag</string>
+    <string name="add_tag_name_label">Checkpoint name</string>
+    <string name="add_tag_name_hint">North Gate</string>
+    <string name="add_tag_program">Program Tag</string>
+    <string name="add_tag_hint">Type the checkpoint name, then press Program Tag.</string>
+    <string name="add_tag_waiting">Hold a tag against the phone now to write \"%1$s\" onto it.</string>
+    <string name="add_tag_waiting_button">Waiting for tag…</string>
+    <string name="add_tag_missing">Enter a checkpoint name.</string>
+    <string name="add_tag_exists">\"%1$s\" is already on this tour. Hold a tag to program it.</string>
     <string name="setup_selected_hint">Hold a tag against the phone now to write \"%1$s\" onto it.</string>
     <string name="setup_written">\"%1$s\" written to the tag.</string>
     <string name="setup_write_failed">Could not write to this tag. It may be read-only or too small.</string>
@@ -86,7 +134,6 @@
     <string name="setup_written_replaced">Tag changed from \"%1$s\" to \"%2$s\".</string>
     <string name="setup_tag_says">That tag currently says \"%1$s\".</string>
     <string name="setup_progress">%1$d of %2$d checkpoints have a tag</string>
-    <string name="setup_add">Add checkpoints</string>
     <string name="setup_add_title">Add checkpoints</string>
     <string name="setup_add_hint">One checkpoint name per line.</string>
     <string name="setup_add_save">Add</string>
