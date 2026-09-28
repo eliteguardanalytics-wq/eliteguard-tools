@@ -140,6 +140,26 @@ checkpoint-app/
   app/src/main/res/             layouts, strings, colours, icons
 ```
 
+## Colour
+
+The app uses the Siloam One brand palette: Ink `#0F1A2A`, Slate `#46586E`, Bone `#F6F4F0`,
+Brass `#D08E2C`, White `#FFFFFF`. Those five are in `res/values/colors.xml` exactly as supplied,
+and everything else is derived from them rather than invented — tints are washes of a hue over
+Bone, and text colours are darkened until they clear WCAG AA on whatever they sit on. The
+measured ratios are recorded beside each token so a future change can be checked instead of
+guessed at. All twenty text pairings in the app pass AA.
+
+Brass is the accent. It carries the header accent, the progress fill, the selected checkpoint and
+the informational banners, but it is a mid-tone, so it is never body text on a light surface
+(2.77:1 on White) and never sits behind white text. Banner text uses a darkened Brass instead.
+
+Two colours sit outside the brand because they carry meaning the palette has no room for: a
+muted forest green for a scanned checkpoint, and a brick red for a failure. Both are desaturated
+to sit with the warm neutrals. Colour is never the only signal — a scanned checkpoint also gains
+a tick in place of its number, its detail line changes, and it moves to the bottom of the list —
+which matters because green and red are close in luminance and hard to separate for a
+red-green colourblind officer.
+
 ## Design notes
 
 - **No third-party libraries.** The app uses only the Android framework and the Kotlin standard

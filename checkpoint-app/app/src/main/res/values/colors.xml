@@ -1,21 +1,87 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Siloam One brand palette.
+
+  The five brand colours are exactly as supplied. Everything else is derived from them,
+  not invented: tints are washes of a hue over Bone, and text colours are darkened until
+  they clear WCAG AA (4.5:1) on the surface they sit on. Measured ratios are noted so a
+  future change can be checked rather than guessed at.
+
+    Ink    #0F1A2A    Slate  #46586E    Bone   #F6F4F0
+    Brass  #D08E2C    White  #FFFFFF
+-->
 <resources>
-    <color name="navy">#0F2A44</color>
-    <color name="navy_dark">#091B2E</color>
-    <color name="navy_light">#1E3F63</color>
-    <color name="gold">#F2B233</color>
-    <color name="gold_dark">#C98E14</color>
-    <color name="background">#F3F5F8</color>
-    <color name="surface">#FFFFFF</color>
-    <color name="text_primary">#101820</color>
-    <color name="text_secondary">#5B6875</color>
-    <color name="divider">#E1E6EC</color>
-    <color name="success">#1E8E4C</color>
-    <color name="success_bg">#E4F5EA</color>
-    <color name="warning">#B26A00</color>
-    <color name="warning_bg">#FFF3DD</color>
-    <color name="error">#C62828</color>
-    <color name="error_bg">#FDE7E7</color>
-    <color name="pending_bg">#EEF1F5</color>
-    <color name="ic_launcher_background">#0F2A44</color>
+    <!-- ============ brand ============ -->
+    <color name="ink">#0F1A2A</color>
+    <color name="slate">#46586E</color>
+    <color name="bone">#F6F4F0</color>
+    <color name="brass">#D08E2C</color>
+    <color name="white">#FFFFFF</color>
+
+    <!-- Ink taken 35% toward black, so the status bar reads as a shade above the toolbar. -->
+    <color name="ink_deep">#0A111B</color>
+
+    <!-- ============ surfaces ============ -->
+    <color name="background">@color/bone</color>
+    <color name="surface">@color/white</color>
+    <!--
+      Slate washed 40% into Bone. A card face is White on a Bone page, which is only
+      1.10:1, so the border is what actually separates one checkpoint row from the next
+      in daylight. At 1.86:1 against the page it is clearly visible; taking it all the
+      way to the 3:1 non-text threshold would read as a hard outline on a near-white
+      page, and row separation is carried mostly by the Ink step circle and the gaps.
+    -->
+    <color name="divider">#B0B6BC</color>
+    <!-- Neutral badge fill. Ink on it measures 14.25:1. -->
+    <color name="muted_bg">#E8E8E6</color>
+
+    <!-- ============ text ============ -->
+    <!-- Ink on Bone 15.91:1, on White 17.48:1 -->
+    <color name="text_primary">@color/ink</color>
+    <!-- Slate on Bone 6.63:1, on White 7.29:1 -->
+    <color name="text_secondary">@color/slate</color>
+    <!-- On the Ink header. White on Ink measures 17.48:1. -->
+    <color name="on_ink">#FFFFFF</color>
+    <color name="on_ink_muted">#CCFFFFFF</color>
+    <color name="on_ink_faint">#8AFFFFFF</color>
+    <color name="on_ink_track">#44FFFFFF</color>
+
+    <!-- ============ accent, and the informational state ============ -->
+    <!--
+      Brass is a mid-tone, so it carries fills and accents but cannot be body text on a
+      light surface (2.77:1 on White) and cannot sit behind white text. On the Ink header
+      it is fine at 6.32:1, and it takes Ink text at 6.32:1.
+    -->
+    <color name="accent">@color/brass</color>
+    <!-- Brass washed 14% over Bone, for the hint and in-progress banners. -->
+    <color name="accent_bg">#F1E6D5</color>
+    <!-- Brass darkened until it clears AA on that wash: 4.62:1 there, 5.70:1 on White. -->
+    <color name="accent_text">#895E1D</color>
+    <!-- 3.10:1 on the wash, which is the non-text minimum and enough for a 1dp border. -->
+    <color name="accent_line">#AF7725</color>
+
+    <!-- ============ scanned / done ============ -->
+    <!-- A deep forest green, muted to sit with a warm palette. 6.32:1 on White. -->
+    <color name="success">#2F6B4A</color>
+    <color name="success_bg">#DAE1D9</color>
+    <!-- 4.74:1 on its own tint. -->
+    <color name="success_line">@color/success</color>
+
+    <!-- ============ failure ============ -->
+    <!-- A brick red rather than a pure red, for the same reason. 6.52:1 on White. -->
+    <color name="error">#A6382B</color>
+    <color name="error_bg">#EBDAD4</color>
+    <!-- 4.81:1 on its own tint. -->
+    <color name="error_line">@color/error</color>
+
+    <!-- ============ controls ============ -->
+    <color name="button_primary">@color/ink</color>
+    <color name="button_primary_pressed">@color/ink_deep</color>
+    <!-- Slate keeps White text readable when a button disables, at 7.29:1, so the label
+         colour does not have to change along with the fill. -->
+    <color name="button_disabled">@color/slate</color>
+    <color name="button_danger">@color/error</color>
+    <color name="button_danger_pressed">#7E2A20</color>
+
+    <color name="ic_launcher_background">@color/ink</color>
 </resources>

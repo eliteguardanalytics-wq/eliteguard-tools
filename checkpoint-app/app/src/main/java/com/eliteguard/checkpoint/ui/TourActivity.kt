@@ -145,7 +145,7 @@ class TourActivity : Activity() {
             else -> getString(R.string.tour_hint)
         }
         hint.setBackgroundResource(if (done) R.drawable.bg_banner_success else R.drawable.bg_banner_warning)
-        hint.setTextColor(getColor(if (done) R.color.success else R.color.warning))
+        hint.setTextColor(getColor(if (done) R.color.success else R.color.accent_text))
     }
 
     private fun updateNfcBanner() {

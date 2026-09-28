@@ -11,7 +11,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/navy"
+        android:background="@color/ink"
         android:orientation="vertical"
         android:paddingStart="@dimen/screen_padding"
         android:paddingEnd="@dimen/screen_padding"
@@ -21,7 +21,7 @@
             android:id="@+id/officer_name"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/on_ink"
             android:textSize="18sp"
             android:textStyle="bold" />
 
@@ -30,7 +30,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:textColor="@color/gold"
+            android:textColor="@color/brass"
             android:textSize="13sp"
             android:textStyle="bold"
             android:visibility="gone" />
@@ -40,7 +40,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:textColor="#CCFFFFFF"
+            android:textColor="@color/on_ink_muted"
             android:textSize="13sp" />
     </LinearLayout>
 
@@ -62,7 +62,7 @@
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_banner_warning"
                 android:padding="14dp"
-                android:textColor="@color/warning"
+                android:textColor="@color/accent_text"
                 android:textSize="14sp"
                 android:textStyle="bold"
                 android:visibility="gone" />

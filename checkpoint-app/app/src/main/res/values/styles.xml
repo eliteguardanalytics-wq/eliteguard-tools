@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.EliteGuard" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:colorPrimary">@color/navy</item>
-        <item name="android:colorPrimaryDark">@color/navy_dark</item>
-        <item name="android:colorAccent">@color/gold</item>
-        <item name="android:statusBarColor">@color/navy_dark</item>
-        <item name="android:navigationBarColor">@color/navy_dark</item>
+        <item name="android:colorPrimary">@color/ink</item>
+        <item name="android:colorPrimaryDark">@color/ink_deep</item>
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:statusBarColor">@color/ink_deep</item>
+        <item name="android:navigationBarColor">@color/ink_deep</item>
         <item name="android:windowBackground">@color/background</item>
         <item name="android:textColorPrimary">@color/text_primary</item>
         <item name="android:textColorSecondary">@color/text_secondary</item>
@@ -13,20 +13,20 @@
     </style>
 
     <style name="Theme.EliteGuard.Dialog" parent="android:Theme.Material.Light.Dialog.Alert">
-        <item name="android:colorAccent">@color/navy</item>
+        <item name="android:colorAccent">@color/ink</item>
     </style>
 
     <style name="Toolbar">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">56dp</item>
-        <item name="android:background">@color/navy</item>
+        <item name="android:background">@color/ink</item>
         <item name="android:theme">@style/ToolbarTheme</item>
         <item name="android:elevation">4dp</item>
     </style>
 
     <style name="ToolbarTheme" parent="android:ThemeOverlay.Material.Dark.ActionBar">
-        <item name="android:textColorPrimary">#FFFFFF</item>
-        <item name="android:textColorSecondary">#FFFFFF</item>
+        <item name="android:textColorPrimary">@color/on_ink</item>
+        <item name="android:textColorSecondary">@color/on_ink_muted</item>
     </style>
 
     <style name="Input">
@@ -43,7 +43,7 @@
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">56dp</item>
         <item name="android:background">@drawable/bg_button_primary</item>
-        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textColor">@color/on_ink</item>
         <item name="android:textSize">17sp</item>
         <item name="android:textAllCaps">false</item>
         <item name="android:textStyle">bold</item>
@@ -52,7 +52,7 @@
 
     <style name="SecondaryButton" parent="PrimaryButton">
         <item name="android:background">@drawable/bg_button_secondary</item>
-        <item name="android:textColor">@color/navy</item>
+        <item name="android:textColor">@color/ink</item>
     </style>
 
     <style name="DangerButton" parent="PrimaryButton">

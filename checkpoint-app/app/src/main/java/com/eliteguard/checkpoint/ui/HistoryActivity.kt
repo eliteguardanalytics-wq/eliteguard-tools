@@ -68,7 +68,7 @@ class HistoryActivity : Activity() {
             val status = view.findViewById<TextView>(R.id.status)
             when (log.status) {
                 LogStatus.IN_PROGRESS -> {
-                    status.text = getString(R.string.history_status_in_progress); status.setTextColor(getColor(R.color.warning))
+                    status.text = getString(R.string.history_status_in_progress); status.setTextColor(getColor(R.color.accent_text))
                 }
                 LogStatus.COMPLETED -> {
                     status.text = getString(R.string.history_status_completed); status.setTextColor(getColor(R.color.success))
@@ -81,7 +81,7 @@ class HistoryActivity : Activity() {
                 getString(R.string.history_line, TimeFmt.dateTime(log.startedAt), log.scannedCheckpoints, log.totalCheckpoints)
             val sync = view.findViewById<TextView>(R.id.sync)
             sync.text = if (log.synced) getString(R.string.history_uploaded) else getString(R.string.history_not_uploaded)
-            sync.setTextColor(getColor(if (log.synced) R.color.success else R.color.warning))
+            sync.setTextColor(getColor(if (log.synced) R.color.success else R.color.accent_text))
             return view
         }
     }

@@ -2,7 +2,7 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/navy"
+    android:background="@color/ink"
     android:fillViewport="true">
 
     <LinearLayout
@@ -23,7 +23,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
             android:text="@string/app_name"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/on_ink"
             android:textSize="26sp"
             android:textStyle="bold" />
 
@@ -90,7 +90,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:textColor="#88FFFFFF"
+            android:textColor="@color/on_ink_faint"
             android:textSize="12sp" />
     </LinearLayout>
 </ScrollView>
