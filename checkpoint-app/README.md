@@ -205,6 +205,55 @@ densities are 46 KB together instead of 280 KB, on an app that is otherwise abou
 If Siloam One has an official reversed or knockout asset, drop it in over these files and nothing
 else needs to change.
 
+## Testing activation without a portal
+
+The portal is not involved. Licenses live in the database, and the address typed on the
+activation screen is only ever compared against a column, so nothing has to be served at it.
+
+**First make sure the schema is current.** `site_licenses` arrived with device activation, so a
+database set up before that will answer `relation "public.site_licenses" does not exist`.
+Re-running `checkpoint_schema.sql` adds it and leaves existing tours, checkpoints and tour logs
+untouched.
+
+1. Issue a license and read back the key:
+
+   ```sql
+   insert into public.site_licenses (property_id, portal_host, label)
+   select id, 'eliteguard.siloam.one', 'Test phone'
+   from public.properties where name = 'Ocean Place'
+   returning license_key;
+   ```
+
+2. Check it in the SQL editor, which is the same call the app makes:
+
+   ```sql
+   select * from public.verify_site_license('PASTE_KEY', 'eliteguard.siloam.one');
+   select * from public.verify_site_license('PASTE_KEY', 'wrong.host');
+   ```
+
+   One row, then none.
+
+3. Check it as `anon`, which the SQL editor cannot do because it runs as a superuser. This is
+   the only test that proves the `revoke` and `grant` block at the end of the schema took
+   effect:
+
+   ```bash
+   curl -s -X POST 'https://YOUR-PROJECT.supabase.co/rest/v1/rpc/verify_site_license' \
+     -H 'apikey: YOUR_PUBLISHABLE_KEY' \
+     -H 'Authorization: Bearer YOUR_PUBLISHABLE_KEY' \
+     -H 'Content-Type: application/json' \
+     -d '{"p_license_key":"PASTE_KEY","p_portal_host":"eliteguard.siloam.one"}'
+   ```
+
+   Expect `[{"property_id":"...","property_name":"Ocean Place"}]`. An empty `[]` means the key
+   and host do not match a row; a 401 or `permission denied` means the grants did not run.
+
+4. Type the host and key into the app.
+
+To avoid the real hostname entirely, set `portal_host` to anything — `test.local`, say — and type
+that on the activation screen. The config lookup fails instantly, the app falls back to the
+compiled-in backend, and the license still matches.
+
 ## Keyboard and system bars
 
 `targetSdk` is 36, and Android 15 forces edge-to-edge on anything targeting API 35 or higher.
