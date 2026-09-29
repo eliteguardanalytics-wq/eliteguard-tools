@@ -5,7 +5,7 @@ import com.eliteguard.checkpoint.Config
 
 /**
  * What this phone is. Set once during enrolment and then left alone: the portal host, the site
- * licence it was activated with, the site it belongs to, and the backend that host resolved to.
+ * license it was activated with, the site it belongs to, and the backend that host resolved to.
  *
  * Kept separate from [Session] on purpose. Signing out clears the officer, not the device, so
  * enrolment survives every sign-out and only a deliberate reset undoes it.
@@ -77,7 +77,7 @@ class Device(context: Context) {
             return h
         }
 
-        /** Strips the grouping a printed licence key may carry, so it can be typed any way. */
+        /** Strips the grouping a printed license key may carry, so it can be typed any way. */
         fun normalizeLicense(typed: String): String = typed.filter { it.isLetterOrDigit() }.uppercase()
     }
 }

@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.EliteGuard" parent="android:Theme.Material.Light.NoActionBar">
+    <!--
+        Everything lives on the Base theme so values-v35 can add one attribute without
+        restating the rest. A style declared in a more specific resource folder replaces the
+        base one outright rather than merging with it.
+    -->
+    <style name="Theme.EliteGuard" parent="Theme.EliteGuard.Base" />
+
+    <style name="Theme.EliteGuard.Base" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:colorPrimary">@color/ink</item>
         <item name="android:colorPrimaryDark">@color/ink_deep</item>
         <item name="android:colorAccent">@color/accent</item>

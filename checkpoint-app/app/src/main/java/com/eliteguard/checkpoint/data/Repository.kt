@@ -34,8 +34,8 @@ class Repository(
     /** The phone has not been enrolled against a site yet. */
     class NotEnrolled : IOException("This device is not assigned to a site")
 
-    /** The licence key did not match the portal host it was entered with. */
-    class LicenseRejected : IOException("Licence key not recognised for that portal")
+    /** The license key did not match the portal host it was entered with. */
+    class LicenseRejected : IOException("License key not recognised for that portal")
 
     /** The site this phone was activated against. */
     data class EnrolledSite(val propertyId: String, val propertyName: String, val backendFromHost: Boolean)
@@ -66,7 +66,7 @@ class Repository(
 
     /**
      * Ties this phone to one site. Resolves the portal host to a backend, asks that backend
-     * whether the licence key belongs to the host, and only stores anything once it says yes.
+     * whether the license key belongs to the host, and only stores anything once it says yes.
      *
      * Done once per phone. Signing out does not undo it.
      */

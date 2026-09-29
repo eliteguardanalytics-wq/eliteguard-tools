@@ -4,7 +4,7 @@ package com.eliteguard.checkpoint
  * Compile-time defaults.
  *
  * The backend is not fixed at build time any more. A phone is enrolled once against a portal
- * host (for example `eliteguard.siloam.one`) and a site licence key, and the host decides which
+ * host (for example `eliteguard.siloam.one`) and a site license key, and the host decides which
  * Supabase project the app talks to — see [com.eliteguard.checkpoint.net.TenantConfig]. The
  * values below are only the fallback used when a host publishes no configuration of its own,
  * which is the case for Elite Guard today.
@@ -47,5 +47,5 @@ object Config {
     /** Columns searched, in order, for the officer's login name. */
     val USERNAME_COLUMNS = listOf("username", "email", "display_name", "full_name", "name")
 
-    const val VERSION_NAME = "3.0.1"
+    const val VERSION_NAME = "3.0.2"
 }

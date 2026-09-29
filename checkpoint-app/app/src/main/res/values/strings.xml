@@ -5,17 +5,17 @@
 
     <!-- Device enrolment -->
     <string name="enrol_title">Activate This Phone</string>
-    <string name="enrol_subtitle">Enter your portal address and the site licence issued for it. This is only needed once.</string>
+    <string name="enrol_subtitle">Enter your portal address and the site license issued for it. This is only needed once.</string>
     <string name="enrol_host_label">Portal address</string>
     <string name="enrol_host_hint">eliteguard.siloam.one</string>
-    <string name="enrol_license_label">Site licence</string>
+    <string name="enrol_license_label">Site license</string>
     <string name="enrol_license_hint">XXXX-XXXX-XXXX-XXXX</string>
     <string name="enrol_activate">Activate</string>
-    <string name="enrol_checking">Checking licence…</string>
-    <string name="enrol_missing">Enter the portal address and the site licence.</string>
-    <string name="enrol_rejected">That licence is not valid for this portal address. Check both and try again.</string>
+    <string name="enrol_checking">Checking license…</string>
+    <string name="enrol_missing">Enter the portal address and the site license.</string>
+    <string name="enrol_rejected">That license is not valid for this portal address. Check both and try again.</string>
     <string name="enrol_done">This phone is now assigned to %1$s.</string>
-    <string name="enrol_footnote">Dashes and spaces in the licence do not matter, and capitals are not required.</string>
+    <string name="enrol_footnote">Dashes and spaces in the license do not matter, and capitals are not required.</string>
     <string name="not_enrolled">This phone is not assigned to a site yet.</string>
 
     <!-- Login -->

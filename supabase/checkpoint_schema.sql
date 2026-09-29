@@ -199,7 +199,7 @@ alter table public.tour_scans add column if not exists is_duplicate    boolean n
 alter table public.tour_scans add column if not exists created_at      timestamptz not null default now();
 
 -- ---------------------------------------------------------------- 5c. device enrolment
--- A phone is tied to one site before anyone signs in. The portal issues a licence key per
+-- A phone is tied to one site before anyone signs in. The portal issues a license key per
 -- site, and the installer types the portal host and that key once. From then on the phone
 -- only ever sees that site.
 create table if not exists public.site_licenses (
@@ -257,8 +257,8 @@ as $$
         last_seen_at = now()
 $$;
 
--- The one thing an unauthenticated app may ask: does this licence key belong to this host,
--- and if so which site is it. Nothing else about the licence is exposed, and the table
+-- The one thing an unauthenticated app may ask: does this license key belong to this host,
+-- and if so which site is it. Nothing else about the license is exposed, and the table
 -- itself is never readable without a login, so the worst a guessed key reveals is a site
 -- name. Signing in is still required to see or write anything.
 --
@@ -335,7 +335,7 @@ create policy "checkpoints read"   on public.checkpoints for select to authentic
 create policy "checkpoints manage" on public.checkpoints for all    to authenticated
   using ((select public.is_tour_manager())) with check ((select public.is_tour_manager()));
 
--- Licences and devices: only an admin may read or change them. Enrolment does not read
+-- Licenses and devices: only an admin may read or change them. Enrolment does not read
 -- these tables directly, it goes through verify_site_license above.
 drop policy if exists "site_licenses manage" on public.site_licenses;
 create policy "site_licenses manage" on public.site_licenses for all to authenticated

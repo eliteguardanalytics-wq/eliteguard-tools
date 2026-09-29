@@ -17,21 +17,21 @@ gets written onto its NFC tag.
 
 A phone belongs to one site, decided before anyone signs in.
 
-1. The portal issues a **site licence** for a site — a row in `site_licenses` carrying the key and
+1. The portal issues a **site license** for a site — a row in `site_licenses` carrying the key and
    the portal host it is valid for. The key defaults to 16 random hex characters; print it in
    groups of four if that is easier to type.
 2. On first launch the app asks for the **portal address** (`eliteguard.siloam.one`, or
-   `xyzsecurity.siloam.one` for another tenant) and that licence.
-3. The app resolves the address to a backend, checks the licence against it, and stores the site.
+   `xyzsecurity.siloam.one` for another tenant) and that license.
+3. The app resolves the address to a backend, checks the license against it, and stores the site.
    From then on the phone only ever sees that one site. Signing out does not undo it; an admin can
    reassign the phone from the home menu.
 
 The address decides which Supabase project the app talks to. A host may publish
 `https://<host>/app-config.json` holding `supabase_url` and `supabase_anon_key`, which is what
 lets a second tenant work without a new build. When that file is absent, as it is for Elite Guard
-today, the app falls back to the project compiled into `Config.kt`. The licence is still checked
+today, the app falls back to the project compiled into `Config.kt`. The license is still checked
 against whichever backend was resolved, and a key is only accepted for the host it was issued
-for, so a licence cannot be used against another tenant.
+for, so a license cannot be used against another tenant.
 
 ### Then, per person
 
@@ -108,7 +108,7 @@ SQL with no procedural blocks, so any client can run them.
    is keyed by `id`, `user_id` or `auth_user_id`, and whether `role` is text or an enum.
 3. If the app signs in but lists no tours, the incident project's own policies are blocking reads
    of `properties`. The bottom of the schema file has the check and a one-line fix.
-4. Issue a licence for each site so its phones can be activated:
+4. Issue a license for each site so its phones can be activated:
 
    ```sql
    insert into public.site_licenses (property_id, portal_host, label)
@@ -175,7 +175,7 @@ checkpoint-app/
     data/Repository.kt          sync, tour start/scan/end, checkpoint setup
     net/SupabaseClient.kt       tiny Supabase auth + PostgREST client
     nfc/NfcTags.kt              tag serial, NDEF read/write helpers
-    ui/EnrolActivity.kt         one-time activation against a site licence
+    ui/EnrolActivity.kt         one-time activation against a site license
     ui/LoginActivity.kt         sign in
     ui/HomeActivity.kt          Start Tour, sync status, refresh
     ui/SetupMenuActivity.kt     the three admin options
@@ -204,6 +204,24 @@ densities are 46 KB together instead of 280 KB, on an app that is otherwise abou
 
 If Siloam One has an official reversed or knockout asset, drop it in over these files and nothing
 else needs to change.
+
+## Keyboard and system bars
+
+`targetSdk` is 36, and Android 15 forces edge-to-edge on anything targeting API 35 or higher.
+Under that enforcement `android:windowSoftInputMode="adjustResize"` stops having any effect: the
+window no longer shrinks when the keyboard opens, so a field low on the screen ends up underneath
+it, and the status and navigation bars lose the colours set on the theme.
+
+`res/values-v35/styles.xml` opts out, which restores the behaviour these layouts were built for.
+That attribute is deprecated and will be removed in a later release. The permanent fix is to
+handle `WindowInsets.Type.ime()` and `systemBars()` on each screen and lay out behind the bars
+deliberately; that touches every screen and is worth doing with a device in hand rather than
+blind.
+
+Independently of that, `ScrollView.keepFocusedFieldVisible()` in `ui/Ui.kt` scrolls whatever has
+focus back into view whenever the window gets shorter. It reacts to the new size rather than
+guessing at a delay after a field is tapped, so it lands once the size is actually known. The
+activation and sign-in screens both use it.
 
 ## Colour
 
@@ -263,7 +281,7 @@ red-green colourblind officer.
 ## Next steps (not in this app)
 
 - **Web admin portal** at `eliteguard.siloam.one`: a site list, add/edit tours per site, and
-  add checkpoints per tour with a bulk-add box (names only). Issuing and revoking site licences,
+  add checkpoints per tour with a bulk-add box (names only). Issuing and revoking site licenses,
   and a view of enrolled phones from `site_devices`. Plus tour log review, for which the
   `tour_log_summary` view and `tour_scans` table are ready.
 - **`app-config.json` on each tenant host**, once a second tenant exists, so a single build can

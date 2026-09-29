@@ -7,7 +7,7 @@ import org.junit.Test
 /**
  * Enrolment is typed by an installer on a phone keyboard, once, possibly in a stairwell. Both
  * fields are normalised before they reach the server, so the shape of what was typed cannot be
- * the reason a valid licence is rejected.
+ * the reason a valid license is rejected.
  */
 class EnrolInputTest {
 
@@ -40,7 +40,7 @@ class EnrolInputTest {
         }
     }
 
-    @Test fun licenceGroupingAndCasingDoNotMatter() {
+    @Test fun licenseGroupingAndCasingDoNotMatter() {
         val expected = "A1B2C3D4E5F60718"
         for (typed in listOf(
             "A1B2C3D4E5F60718",
@@ -54,7 +54,7 @@ class EnrolInputTest {
         }
     }
 
-    @Test fun anEmptyLicenceNormalisesToEmptyRatherThanThrowing() {
+    @Test fun anEmptyLicenseNormalisesToEmptyRatherThanThrowing() {
         assertEquals("", Device.normalizeLicense(""))
         assertEquals("", Device.normalizeLicense("----"))
         assertEquals("", Device.normalizeLicense("   "))

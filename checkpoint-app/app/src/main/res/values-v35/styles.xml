@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android 15 forces edge-to-edge on anything targeting API 35 or higher, and with it
+    android:windowSoftInputMode="adjustResize" stops having any effect. The window no longer
+    shrinks when the keyboard opens, so a field low on the screen ends up underneath it, which
+    is exactly what happens to the site license box on the activation screen.
+
+    Opting out restores the behaviour the layouts were built for: the window resizes again, and
+    the status and navigation bars keep the Ink colours set on the base theme instead of the
+    app drawing behind them.
+
+    This attribute is deprecated and Google will remove it in a later release. The permanent fix
+    is to handle WindowInsets.Type.ime() and systemBars() on each screen and lay out behind the
+    bars deliberately. That is a bigger change across every screen and is worth doing on a real
+    device rather than blind, so this holds the line until then.
+-->
+<resources>
+    <style name="Theme.EliteGuard" parent="Theme.EliteGuard.Base">
+        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+    </style>
+</resources>

@@ -34,6 +34,7 @@ class LoginActivity : Activity() {
             return
         }
         setContentView(R.layout.activity_login)
+        findViewById<android.widget.ScrollView>(R.id.scroll).keepFocusedFieldVisible()
         username = findViewById(R.id.username)
         password = findViewById(R.id.password)
         error = findViewById(R.id.error)

@@ -3,6 +3,7 @@ package com.eliteguard.checkpoint.ui
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
+import android.graphics.Rect
 import android.content.Intent
 import android.media.AudioManager
 import android.media.ToneGenerator
@@ -10,6 +11,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.widget.ScrollView
 import android.widget.Toast
 import android.widget.Toolbar
 import com.eliteguard.checkpoint.App
@@ -17,6 +19,21 @@ import com.eliteguard.checkpoint.R
 import com.eliteguard.checkpoint.data.Repository
 import com.eliteguard.checkpoint.net.SupabaseClient
 import java.io.IOException
+
+/**
+ * Scrolls whatever has focus back into view when the keyboard takes space away.
+ *
+ * The keyboard opening makes the window shorter, which lays this out shorter. Reacting to the
+ * new size, rather than guessing at a delay after a field is tapped, means the scroll happens
+ * exactly once the size is actually known.
+ */
+fun ScrollView.keepFocusedFieldVisible() {
+    addOnLayoutChangeListener { _, _, top, _, bottom, _, oldTop, _, oldBottom ->
+        if (bottom - top >= oldBottom - oldTop) return@addOnLayoutChangeListener
+        val focused = findFocus() ?: return@addOnLayoutChangeListener
+        post { focused.requestRectangleOnScreen(Rect(0, 0, focused.width, focused.height), false) }
+    }
+}
 
 fun Context.toast(message: CharSequence, long: Boolean = false) {
     Toast.makeText(this, message, if (long) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()

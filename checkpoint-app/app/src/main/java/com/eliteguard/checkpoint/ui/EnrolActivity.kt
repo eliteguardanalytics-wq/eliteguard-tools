@@ -15,7 +15,7 @@ import com.eliteguard.checkpoint.data.Repository
 import com.eliteguard.checkpoint.util.Bg
 
 /**
- * First run only. The installer types the portal host and the site licence issued for it, and
+ * First run only. The installer types the portal host and the site license issued for it, and
  * the phone is tied to that site from then on. Signing out does not undo it; only a deliberate
  * reset from the home screen does.
  */
@@ -33,6 +33,7 @@ class EnrolActivity : Activity() {
             return
         }
         setContentView(R.layout.activity_enrol)
+        findViewById<android.widget.ScrollView>(R.id.scroll).keepFocusedFieldVisible()
         host = findViewById(R.id.host)
         license = findViewById(R.id.license)
         error = findViewById(R.id.error)
