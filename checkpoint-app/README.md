@@ -187,6 +187,24 @@ checkpoint-app/
   app/src/main/res/             layouts, strings, colours, icons
 ```
 
+## Logo
+
+The Siloam One mark on the login screen is `res/drawable-*/logo_siloam_one.png`, at five
+densities. It is a **reversed** version of the supplied artwork: that file is a near-Ink wordmark
+on transparency, which would be invisible on the Ink login background, so it was recoloured by
+inverting lightness — the wordmark becomes Bone, the emblem separators become the darkest parts,
+and the brass rule is kept at exactly `#D08E2C`. Every relationship inside the mark survives, so
+it reads as the same logo rather than a flattened silhouette. Against Ink the wordmark measures
+15.91:1 and the brass rule 6.32:1.
+
+`/tmp/mklogo.py` in the session that produced it is not kept; to regenerate from new artwork,
+crop to `getbbox()`, keep brass-hued pixels, map the rest `lerp(Bone, #35455.9, luminance)`, then
+save each density as a 256-colour palette PNG. Palette rather than full colour matters: the five
+densities are 46 KB together instead of 280 KB, on an app that is otherwise about 720 KB.
+
+If Siloam One has an official reversed or knockout asset, drop it in over these files and nothing
+else needs to change.
+
 ## Colour
 
 The app uses the Siloam One brand palette: Ink `#0F1A2A`, Slate `#46586E`, Bone `#F6F4F0`,

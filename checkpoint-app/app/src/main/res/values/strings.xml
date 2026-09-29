@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Elite Guard Tours</string>
+    <string name="logo_description">Siloam One</string>
 
     <!-- Device enrolment -->
     <string name="enrol_title">Activate This Phone</string>
