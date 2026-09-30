@@ -112,9 +112,20 @@ SQL with no procedural blocks, so any client can run them.
 
    ```sql
    insert into public.site_licenses (property_id, portal_host, label)
-   select id, 'eliteguard.siloam.one', 'Ocean Place phones'
-   from public.properties where name = 'Ocean Place'
-   returning license_key;
+   select p.id, 'eliteguard.siloam.one', p.name
+   from public.properties p
+   returning property_id, license_key;
+   ```
+
+   That issues one per site and cannot silently match nothing, which a `where name = '...'`
+   can do if the name is spelled differently from what is in the table. To read them back with
+   the site names attached:
+
+   ```sql
+   select p.name as site, l.license_key, l.portal_host, l.active
+   from public.site_licenses l
+   join public.properties p on p.id = l.property_id
+   order by p.name;
    ```
 
    The returned key is what the installer types. `site_licenses` is readable only by an admin,
@@ -219,9 +230,22 @@ untouched.
 
    ```sql
    insert into public.site_licenses (property_id, portal_host, label)
-   select id, 'eliteguard.siloam.one', 'Test phone'
-   from public.properties where name = 'Ocean Place'
-   returning license_key;
+   select p.id, 'eliteguard.siloam.one', p.name
+   from public.properties p
+   returning property_id, license_key;
+   ```
+
+   One per site. Do not narrow it with `where name = 'Something'` unless you have copied the
+   name out of the table: a name that does not match inserts nothing, returns nothing, and the
+   next step then reports no rows for a license that was never created.
+
+   To read the keys back with their site names:
+
+   ```sql
+   select p.name as site, l.license_key, l.portal_host, l.active
+   from public.site_licenses l
+   join public.properties p on p.id = l.property_id
+   order by p.name;
    ```
 
 2. Check it in the SQL editor, which is the same call the app makes:
@@ -245,7 +269,7 @@ untouched.
      -d '{"p_license_key":"PASTE_KEY","p_portal_host":"eliteguard.siloam.one"}'
    ```
 
-   Expect `[{"property_id":"...","property_name":"Ocean Place"}]`. An empty `[]` means the key
+   Expect `[{"property_id":"...","property_name":"<your site>"}]`. An empty `[]` means the key
    and host do not match a row; a 401 or `permission denied` means the grants did not run.
 
 4. Type the host and key into the app.
