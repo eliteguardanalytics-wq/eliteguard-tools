@@ -216,6 +216,59 @@ densities are 46 KB together instead of 280 KB, on an app that is otherwise abou
 If Siloam One has an official reversed or knockout asset, drop it in over these files and nothing
 else needs to change.
 
+## Creating a test site
+
+A site is a row in `public.properties`. That table belongs to the incident reporting project and
+is shared with it, so a test site will also appear in the incident portal site list. Give it a
+name that makes that obvious.
+
+Check first what the table needs, since it may have columns beyond name that this app never
+touches:
+
+```sql
+select column_name, is_nullable, column_default
+from information_schema.columns
+where table_schema = 'public' and table_name = 'properties'
+order by ordinal_position;
+```
+
+Anything `NO` under `is_nullable` with no default has to be supplied. Then create the site and
+its license together:
+
+```sql
+with s as (
+  insert into public.properties (name) values ('ZZ TEST SITE - delete me') returning id, name
+)
+insert into public.site_licenses (property_id, portal_host, label)
+select s.id, 'eliteguard.siloam.one', s.name from s
+returning property_id, license_key;
+```
+
+### Removing it again
+
+`tour_logs` is `on delete restrict` against both its site and its tour, on purpose: deleting a
+site must never quietly erase the patrol history taken at it. So once a test tour has been
+walked, deleting the site fails with a foreign key error on `tour_logs`. Delete the logs first,
+which takes their scans with them, then the site, which takes the tours, checkpoints, licenses
+and device records with it:
+
+```sql
+delete from public.tour_logs
+where property_id = (select id from public.properties where name = 'ZZ TEST SITE - delete me');
+
+delete from public.properties where name = 'ZZ TEST SITE - delete me';
+```
+
+If you would rather keep the test data and only stop the license working, deactivate it instead
+and leave everything else alone:
+
+```sql
+update public.site_licenses set active = false where license_key = 'PASTE_KEY';
+```
+
+A phone already activated keeps working, since the license is only checked once at activation.
+Reassign it from the home menu to move it off the test site.
+
 ## Testing activation without a portal
 
 The portal is not involved. Licenses live in the database, and the address typed on the
