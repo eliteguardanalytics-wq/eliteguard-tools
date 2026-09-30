@@ -59,6 +59,7 @@ class AddTagActivity : Activity() {
         tour = loaded
         setContentView(R.layout.activity_add_tag)
         setupToolbar(findViewById<Toolbar>(R.id.toolbar), getString(R.string.add_tag_title), showUp = true)
+        applyWindowInsets(top = findViewById(R.id.toolbar), bottom = findViewById(R.id.root))
         actionBar?.subtitle = "${tour.propertyName} · ${tour.name}"
         name = findViewById(R.id.name)
         program = findViewById(R.id.program)

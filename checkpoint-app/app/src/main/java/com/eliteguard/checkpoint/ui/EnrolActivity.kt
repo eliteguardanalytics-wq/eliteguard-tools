@@ -33,7 +33,7 @@ class EnrolActivity : Activity() {
             return
         }
         setContentView(R.layout.activity_enrol)
-        findViewById<android.widget.ScrollView>(R.id.scroll).keepFocusedFieldVisible()
+        findViewById<android.widget.ScrollView>(R.id.scroll).let { it.keepFocusedFieldVisible(); applyWindowInsets(top = it, bottom = it) }
         host = findViewById(R.id.host)
         license = findViewById(R.id.license)
         error = findViewById(R.id.error)

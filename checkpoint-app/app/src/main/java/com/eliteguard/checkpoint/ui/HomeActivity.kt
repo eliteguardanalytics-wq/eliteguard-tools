@@ -37,6 +37,7 @@ class HomeActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_home)
         setupToolbar(findViewById<Toolbar>(R.id.toolbar), getString(R.string.home_title), showUp = false)
+        applyWindowInsets(top = findViewById(R.id.toolbar), bottom = findViewById(R.id.root))
 
         findViewById<TextView>(R.id.officer_name).text = getString(R.string.home_greeting, app.session.officerName)
         findViewById<TextView>(R.id.officer_role).apply {

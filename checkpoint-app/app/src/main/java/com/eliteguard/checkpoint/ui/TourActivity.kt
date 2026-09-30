@@ -65,6 +65,8 @@ class TourActivity : Activity() {
         tour = loaded
         setContentView(R.layout.activity_tour)
         setupToolbar(findViewById<Toolbar>(R.id.toolbar), tour.name, showUp = true)
+        // The footer is the last thing on this screen, so it is what clears the navigation bar.
+        applyWindowInsets(top = findViewById(R.id.toolbar), bottom = findViewById(R.id.footer))
         actionBar?.subtitle = tour.propertyName
 
         status = findViewById(R.id.status)

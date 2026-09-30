@@ -4,10 +4,12 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.graphics.Rect
+import android.os.Build
 import android.content.Intent
 import android.media.AudioManager
 import android.media.ToneGenerator
-import android.os.Build
+import android.view.View
+import android.view.WindowInsets
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -19,6 +21,45 @@ import com.eliteguard.checkpoint.R
 import com.eliteguard.checkpoint.data.Repository
 import com.eliteguard.checkpoint.net.SupabaseClient
 import java.io.IOException
+
+/**
+ * Lays a screen out around the status bar, the navigation bar and the keyboard.
+ *
+ * From Android 15 an app targeting API 35 or higher draws behind the system bars, and Android 16
+ * removed the opt-out for anything targeting API 36. `adjustResize` therefore does nothing: the
+ * window never shrinks, so a toolbar sits under the clock and a field near the bottom sits under
+ * the keyboard. The sizes arrive as window insets instead, and this applies them as padding.
+ *
+ * [top] takes the status bar height and should be a view already painted the right colour, so it
+ * simply grows upward into that space. [bottom] takes whichever is taller of the navigation bar
+ * and the keyboard, so the last thing on screen stays clear of both.
+ *
+ * Below API 35 the system still insets the window itself, and padding again would double it.
+ */
+fun Activity.applyWindowInsets(top: View? = null, bottom: View? = null) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return
+    // Captured once: the listener runs again on every keyboard or rotation change, and reading
+    // the current padding each time would add the inset on top of the inset already applied.
+    val topPadding = top?.paddingTop ?: 0
+    val bottomPadding = bottom?.paddingBottom ?: 0
+    val host = findViewById<View>(android.R.id.content)
+    host.setOnApplyWindowInsetsListener { view, insets ->
+        val bars = insets.getInsets(WindowInsets.Type.systemBars())
+        val keyboard = insets.getInsets(WindowInsets.Type.ime()).bottom
+        top?.let { it.setPadding(it.paddingLeft, topPadding + bars.top, it.paddingRight, it.paddingBottom) }
+        bottom?.let {
+            it.setPadding(it.paddingLeft, it.paddingTop, it.paddingRight, bottomPadding + maxOf(bars.bottom, keyboard))
+        }
+        if (keyboard > 0) {
+            val focused = currentFocus
+            if (focused != null) {
+                view.post { focused.requestRectangleOnScreen(Rect(0, 0, focused.width, focused.height), false) }
+            }
+        }
+        insets
+    }
+    host.requestApplyInsets()
+}
 
 /**
  * Scrolls whatever has focus back into view when the keyboard takes space away.

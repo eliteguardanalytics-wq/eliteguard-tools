@@ -331,23 +331,36 @@ To avoid the real hostname entirely, set `portal_host` to anything — `test.loc
 that on the activation screen. The config lookup fails instantly, the app falls back to the
 compiled-in backend, and the license still matches.
 
-## Keyboard and system bars
+## System bars, keyboard and orientation
 
-`targetSdk` is 36, and Android 15 forces edge-to-edge on anything targeting API 35 or higher.
-Under that enforcement `android:windowSoftInputMode="adjustResize"` stops having any effect: the
-window no longer shrinks when the keyboard opens, so a field low on the screen ends up underneath
-it, and the status and navigation bars lose the colours set on the theme.
+`targetSdk` is 36. From Android 15 an app targeting API 35 or higher draws behind the status and
+navigation bars, and Android 16 removed `windowOptOutEdgeToEdgeEnforcement` for anything
+targeting API 36, so there is no way to turn it off. `adjustResize` has no effect either: the
+window never shrinks, which is why the toolbar sat under the clock and the sign-in fields sat
+under the keyboard.
 
-`res/values-v35/styles.xml` opts out, which restores the behaviour these layouts were built for.
-That attribute is deprecated and will be removed in a later release. The permanent fix is to
-handle `WindowInsets.Type.ime()` and `systemBars()` on each screen and lay out behind the bars
-deliberately; that touches every screen and is worth doing with a device in hand rather than
-blind.
+`Activity.applyWindowInsets(top, bottom)` in `ui/Ui.kt` handles it. The status bar height is
+added as top padding to a view that is already painted the right colour, so it grows up into
+that space rather than leaving a stripe: the Ink toolbar on most screens, the Ink scroll
+container on activation and sign-in. The bottom view takes whichever is taller of the navigation
+bar and the keyboard, so the last thing on screen clears both — the white footer on the tour
+screen, the screen root elsewhere.
 
-Independently of that, `ScrollView.keepFocusedFieldVisible()` in `ui/Ui.kt` scrolls whatever has
-focus back into view whenever the window gets shorter. It reacts to the new size rather than
-guessing at a delay after a field is tapped, so it lands once the size is actually known. The
-activation and sign-in screens both use it.
+Two details that are easy to get wrong:
+
+- The `Toolbar` style is `wrap_content` with a 56dp `minHeight`, not a fixed 56dp. A fixed
+  height would stay 56dp and push its own title out of view once the inset was added.
+- The insets listener fires again on every keyboard and rotation change, so the base padding is
+  captured once at setup. Reading the current padding each time would add each inset on top of
+  the one already applied.
+
+Below API 35 the helper does nothing, because the system still insets the window itself and
+padding again would double it. `ScrollView.keepFocusedFieldVisible()` covers that path by
+scrolling the focused field back into view whenever the window gets shorter.
+
+Every activity is `android:screenOrientation="portrait"`. Note that Android 16 ignores
+orientation locks on large screens, roughly a tablet at 600dp wide or more, so this holds on
+phones but not there.
 
 ## Colour
 

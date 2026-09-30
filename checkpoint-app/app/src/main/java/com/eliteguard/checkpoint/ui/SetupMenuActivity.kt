@@ -33,6 +33,7 @@ class SetupMenuActivity : Activity() {
         }
         setContentView(R.layout.activity_setup_menu)
         setupToolbar(findViewById<Toolbar>(R.id.toolbar), getString(R.string.setup_title), showUp = true)
+        applyWindowInsets(top = findViewById(R.id.toolbar), bottom = findViewById(R.id.root))
         actionBar?.subtitle = app.device.siteName
 
         findViewById<Button>(R.id.create_tour).setOnClickListener { promptTourName() }

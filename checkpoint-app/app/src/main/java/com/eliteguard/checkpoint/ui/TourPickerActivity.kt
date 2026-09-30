@@ -47,6 +47,7 @@ class TourPickerActivity : Activity() {
         }
         setContentView(R.layout.activity_tour_picker)
         setupToolbar(findViewById<Toolbar>(R.id.toolbar), getString(R.string.picker_title), showUp = true)
+        applyWindowInsets(top = findViewById(R.id.toolbar), bottom = findViewById(R.id.root))
         actionBar?.subtitle = app.device.siteName
         findViewById<TextView>(R.id.hint).setText(
             when (mode) {

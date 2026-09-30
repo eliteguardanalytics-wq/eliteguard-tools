@@ -63,6 +63,7 @@ class SetupActivity : Activity() {
         tour = loaded
         setContentView(R.layout.activity_setup)
         setupToolbar(findViewById<Toolbar>(R.id.toolbar), getString(R.string.setup_title), showUp = true)
+        applyWindowInsets(top = findViewById(R.id.toolbar), bottom = findViewById(R.id.root))
         actionBar?.subtitle = "${tour.propertyName} · ${tour.name}"
         hint = findViewById(R.id.hint)
         nfcBanner = findViewById(R.id.nfc_banner)

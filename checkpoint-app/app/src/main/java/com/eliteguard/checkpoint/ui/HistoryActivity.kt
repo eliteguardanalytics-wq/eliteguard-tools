@@ -26,6 +26,7 @@ class HistoryActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_history)
         setupToolbar(findViewById<Toolbar>(R.id.toolbar), getString(R.string.history_title), showUp = true)
+        applyWindowInsets(top = findViewById(R.id.toolbar), bottom = findViewById(R.id.root))
         findViewById<ListView>(R.id.list).adapter = adapter
     }
 

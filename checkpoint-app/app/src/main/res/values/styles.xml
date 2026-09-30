@@ -23,9 +23,15 @@
         <item name="android:colorAccent">@color/ink</item>
     </style>
 
+    <!--
+        Height is wrap_content with a 56dp floor rather than a fixed 56dp, because the status
+        bar inset is added to this view as top padding. A fixed height would keep the bar the
+        same size and push its own title out of it.
+    -->
     <style name="Toolbar">
         <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">56dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">56dp</item>
         <item name="android:background">@color/ink</item>
         <item name="android:theme">@style/ToolbarTheme</item>
         <item name="android:elevation">4dp</item>
