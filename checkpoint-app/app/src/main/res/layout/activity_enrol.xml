@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/scroll"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@color/ink" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:gravity="center" android:orientation="vertical" android:padding="24dp">
+        <ImageView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:adjustViewBounds="true" android:maxWidth="240dp" android:scaleType="fitCenter"
+            android:contentDescription="@string/logo_description" android:src="@drawable/logo_siloam_one" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="10dp" android:letterSpacing="0.14" android:text="@string/app_name"
+            android:textAllCaps="true" android:textColor="@color/on_ink_muted" android:textSize="12sp"
+            android:textStyle="bold" />
+        <LinearLayout style="@style/Card" android:layout_marginTop="24dp" android:orientation="vertical" android:padding="20dp">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="@string/enrol_title" android:textColor="@color/text_primary" android:textSize="20sp" android:textStyle="bold" />
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp"
+                android:text="@string/enrol_subtitle" android:textColor="@color/text_secondary" android:textSize="13sp" />
+            <TextView style="@style/Label" android:layout_marginTop="18dp" android:text="@string/enrol_host_label" />
+            <EditText android:id="@+id/host" style="@style/Input" android:layout_marginTop="6dp"
+                android:hint="@string/enrol_host_hint" android:imeOptions="actionNext"
+                android:inputType="textUri|textNoSuggestions" android:singleLine="true" />
+            <TextView style="@style/Label" android:layout_marginTop="16dp" android:text="@string/enrol_license_label" />
+            <EditText android:id="@+id/license" style="@style/Input" android:layout_marginTop="6dp"
+                android:hint="@string/enrol_license_hint" android:imeOptions="actionDone"
+                android:inputType="textCapCharacters|textNoSuggestions" android:singleLine="true" />
+            <TextView android:id="@+id/error" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="12dp" android:textColor="@color/error" android:textSize="14sp" android:visibility="gone" />
+            <Button android:id="@+id/activate" style="@style/PrimaryButton" android:layout_marginTop="20dp" android:text="@string/enrol_activate" />
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp"
+                android:text="@string/enrol_footnote" android:textColor="@color/text_secondary" android:textSize="12sp" />
+        </LinearLayout>
+        <TextView android:id="@+id/version" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="20dp" android:textColor="@color/on_ink_faint" android:textSize="12sp" />
+    </LinearLayout>
+</ScrollView>

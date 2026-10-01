@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+    <Toolbar android:id="@+id/toolbar" style="@style/Toolbar" />
+    <TextView android:id="@+id/nfc_banner" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/screen_padding" android:layout_marginTop="12dp" android:layout_marginEnd="@dimen/screen_padding"
+        android:background="@drawable/bg_banner_error" android:padding="14dp" android:textColor="@color/error"
+        android:textSize="14sp" android:textStyle="bold" android:visibility="gone" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="@dimen/screen_padding">
+        <TextView style="@style/Label" android:text="@string/add_tag_name_label" />
+        <EditText android:id="@+id/name" style="@style/Input" android:layout_marginTop="6dp"
+            android:hint="@string/add_tag_name_hint" android:imeOptions="actionDone"
+            android:inputType="textCapWords" android:singleLine="true" />
+        <TextView android:id="@+id/status" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="14dp" android:background="@drawable/bg_banner_warning" android:padding="14dp"
+            android:textColor="@color/accent_text" android:textSize="14sp" />
+        <Button android:id="@+id/program" style="@style/PrimaryButton" android:layout_marginTop="16dp" android:text="@string/add_tag_program" />
+    </LinearLayout>
+</LinearLayout>

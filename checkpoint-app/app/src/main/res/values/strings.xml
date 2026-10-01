@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Elite Guard Tours</string>
+    <string name="logo_description">Siloam One</string>
+
+    <!-- Device enrolment -->
+    <string name="enrol_title">Activate This Phone</string>
+    <string name="enrol_subtitle">Enter your portal address and the site license issued for it. This is only needed once.</string>
+    <string name="enrol_host_label">Portal address</string>
+    <string name="enrol_host_hint">eliteguard.siloam.one</string>
+    <string name="enrol_license_label">Site license</string>
+    <string name="enrol_license_hint">XXXX-XXXX-XXXX-XXXX</string>
+    <string name="enrol_activate">Activate</string>
+    <string name="enrol_checking">Checking license…</string>
+    <string name="enrol_missing">Enter the portal address and the site license.</string>
+    <string name="enrol_rejected">That license is not valid for this portal address. Check both and try again.</string>
+    <string name="enrol_done">This phone is now assigned to %1$s.</string>
+    <string name="enrol_footnote">Dashes and spaces in the license do not matter, and capitals are not required.</string>
+    <string name="not_enrolled">This phone is not assigned to a site yet.</string>
+
+    <!-- Login -->
+    <string name="login_title">Officer Sign In</string>
+    <string name="login_subtitle">Use the same username and password as the Elite Guard incident reporting portal.</string>
+    <string name="login_username">Username</string>
+    <string name="login_password">Password</string>
+    <string name="login_button">Sign In</string>
+    <string name="login_signing_in">Signing in…</string>
+    <string name="login_missing">Enter your username and password.</string>
+    <string name="login_invalid">Invalid username or password.</string>
+    <string name="login_no_profile">Account not found. Contact your administrator.</string>
+    <string name="login_network">Could not reach the server. Check your connection and try again.</string>
+
+    <!-- Home -->
+    <string name="home_title">Elite Guard Tours</string>
+    <string name="home_setup_tags">Set Up Tags</string>
+    <string name="home_tours">Tours</string>
+    <string name="home_incident">Incident Report</string>
+    <string name="home_post_orders">Post Orders</string>
+    <string name="home_coming_soon">Coming soon</string>
+    <string name="home_not_built">%1$s is not built yet.</string>
+    <string name="home_greeting">Signed in as %1$s</string>
+    <string name="home_admin">Administrator</string>
+    <string name="home_active_tour">%1$s · %2$s in progress</string>
+    <string name="home_pending_sync">%1$d records waiting to upload</string>
+    <string name="home_all_synced">All tour logs uploaded</string>
+    <string name="menu_reset_device">Reassign this phone</string>
+    <string name="reset_device_title">Reassign this phone?</string>
+    <string name="reset_device_message">This phone is assigned to %1$s. Reassigning signs you out and clears everything saved for that site, so the phone can be activated against another one.</string>
+    <string name="reset_device_pending">This phone is assigned to %1$s and %2$d records have not uploaded yet. The app will try to upload them first, but anything left will be lost. Continue?</string>
+    <string name="reset_device_confirm">Reassign</string>
+    <string name="home_no_tours">No tours have been set up yet. An administrator adds them in the admin portal.</string>
+    <string name="home_refreshing">Refreshing tours and checkpoints…</string>
+    <string name="home_refreshed">Tours and checkpoints updated.</string>
+    <string name="home_offline">Offline – showing what is saved on this phone.</string>
+
+    <!-- Menu -->
+    <string name="menu_refresh">Refresh</string>
+    <string name="menu_history">Tour history</string>
+    <string name="menu_logout">Sign out</string>
+    <string name="logout_confirm_title">Sign out?</string>
+    <string name="logout_confirm_pending">%1$d tour records have not uploaded yet. Signing out keeps them on this phone until you sign in again. Continue?</string>
+    <string name="logout_confirm">Sign out</string>
+    <string name="cancel">Cancel</string>
+    <string name="session_expired">Your session has expired. Please sign in again.</string>
+
+    <!-- Tour picker -->
+    <string name="picker_title">Select a Tour</string>
+    <string name="picker_run_hint">Choose the tour you are about to walk.</string>
+    <string name="picker_program_hint">Choose the tour holding the checkpoint you want to program.</string>
+    <string name="picker_add_hint">Choose the tour to add the new checkpoint to.</string>
+    <string name="picker_empty">No tours have been set up yet.</string>
+    <string name="picker_checkpoint_count">%1$d checkpoints</string>
+    <string name="picker_in_progress">In progress</string>
+
+    <!-- Tour -->
+    <string name="tour_scanned_count">%1$d of %2$d scanned</string>
+    <string name="tour_started_at">Started %1$s</string>
+    <string name="tour_hint">Hold the phone against each checkpoint tag.</string>
+    <string name="tour_complete_banner">All checkpoints scanned – press End Tour to finish.</string>
+    <string name="tour_end">End Tour</string>
+    <string name="tour_no_checkpoints">This tour has no checkpoints yet.</string>
+    <string name="tour_scanned_at">Scanned %1$s</string>
+    <string name="tour_pending">Not scanned</string>
+    <string name="tour_scan_ok">%1$s scanned</string>
+    <string name="tour_scan_duplicate">%1$s was already scanned at %2$s</string>
+    <string name="tour_scan_not_on_tour">\"%1$s\" is not a checkpoint on this tour.</string>
+    <string name="tour_scan_blank">This tag has no checkpoint name on it yet. An administrator needs to set it up.</string>
+    <string name="tour_end_title">End tour?</string>
+    <string name="tour_end_all_done">All %1$d checkpoints were scanned.</string>
+    <string name="tour_end_missing">%1$d of %2$d checkpoints scanned. Not scanned:\n%3$s</string>
+    <string name="tour_end_confirm">End Tour</string>
+    <string name="tour_ended">Tour ended. %1$d of %2$d checkpoints scanned.</string>
+    <string name="tour_sync_later">Saved on phone – will upload when online.</string>
+
+    <!-- NFC -->
+    <string name="nfc_missing">This phone does not have NFC, so checkpoints cannot be scanned.</string>
+    <string name="nfc_disabled">NFC is turned off. Turn it on to scan checkpoints.</string>
+    <string name="nfc_open_settings">Open NFC settings</string>
+
+    <!-- Tag setup -->
+    <string name="setup_title">Set Up Tags</string>
+    <string name="setup_menu_summary">%1$d tours · %2$d checkpoints</string>
+    <string name="setup_create_tour">Create New Tour</string>
+    <string name="setup_create_tour_note">Adds a patrol route at this site. Add its checkpoints afterwards.</string>
+    <string name="setup_program_existing">Program Existing Tag</string>
+    <string name="setup_program_existing_note">Write a tag for a checkpoint that already exists.</string>
+    <string name="setup_add_new">Add New Tag</string>
+    <string name="setup_add_new_note">Name a new checkpoint and program its tag in one go.</string>
+
+    <string name="tour_new_title">New tour</string>
+    <string name="tour_new_hint">Name the patrol route at %1$s.</string>
+    <string name="tour_new_save">Create</string>
+    <string name="tour_new_missing">Enter a tour name.</string>
+    <string name="tour_new_done">Tour \"%1$s\" created.</string>
+
+    <string name="setup_pick_hint">Select the checkpoint whose tag you want to program.</string>
+    <string name="setup_confirm_title">Program this tag?</string>
+    <string name="setup_confirm_new">Write \"%1$s\" onto a tag. You will hold the tag to the phone next.</string>
+    <string name="setup_confirm_again">\"%1$s\" already has a tag. Program another one for it?</string>
+    <string name="setup_confirm_yes">Program</string>
+
+    <string name="add_tag_title">Add New Tag</string>
+    <string name="add_tag_name_label">Checkpoint name</string>
+    <string name="add_tag_name_hint">North Gate</string>
+    <string name="add_tag_program">Program Tag</string>
+    <string name="add_tag_hint">Type the checkpoint name, then press Program Tag.</string>
+    <string name="add_tag_waiting">Hold a tag against the phone now to write \"%1$s\" onto it.</string>
+    <string name="add_tag_waiting_button">Waiting for tag…</string>
+    <string name="add_tag_missing">Enter a checkpoint name.</string>
+    <string name="add_tag_exists">\"%1$s\" is already on this tour. Hold a tag to program it.</string>
+    <string name="setup_selected_hint">Hold a tag against the phone now to write \"%1$s\" onto it.</string>
+    <string name="setup_written">\"%1$s\" written to the tag.</string>
+    <string name="setup_write_failed">Could not write to this tag. It may be read-only or too small.</string>
+    <string name="setup_no_selection">Select a checkpoint first, then hold the tag to the phone.</string>
+    <string name="setup_offline">You must be online to set up tags.</string>
+    <string name="setup_tag_ready">Tag written %1$s</string>
+    <string name="setup_tag_none">No tag written yet</string>
+    <string name="setup_written_replaced">Tag changed from \"%1$s\" to \"%2$s\".</string>
+    <string name="setup_tag_says">That tag currently says \"%1$s\".</string>
+    <string name="setup_progress">%1$d of %2$d checkpoints have a tag</string>
+    <string name="setup_add_title">Add checkpoints</string>
+    <string name="setup_add_hint">One checkpoint name per line.</string>
+    <string name="setup_add_save">Add</string>
+    <string name="setup_add_missing">Enter at least one checkpoint name.</string>
+    <string name="setup_added">%1$d checkpoints added.</string>
+    <string name="setup_added_none">No new checkpoints were added. Those names already exist on this tour.</string>
+    <string name="setup_rename">Rename</string>
+    <string name="setup_rename_title">Rename checkpoint</string>
+    <string name="setup_rename_warning">Renaming does not change tags already written. Re-write the tag after renaming.</string>
+    <string name="setup_remove">Remove checkpoint</string>
+    <string name="setup_remove_message">Remove \"%1$s\" from this tour? Past tour logs keep their records.</string>
+    <string name="setup_remove_confirm">Remove</string>
+    <string name="setup_saved">Saved.</string>
+
+    <!-- History -->
+    <string name="history_title">Tour History</string>
+    <string name="history_empty">No tours recorded on this phone yet.</string>
+    <string name="history_line">%1$s · %2$d of %3$d scanned</string>
+    <string name="history_status_in_progress">In progress</string>
+    <string name="history_status_completed">Completed</string>
+    <string name="history_status_incomplete">Incomplete</string>
+    <string name="history_uploaded">Uploaded</string>
+    <string name="history_not_uploaded">Waiting to upload</string>
+
+    <string name="error_generic">Something went wrong: %1$s</string>
+</resources>

@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/scroll"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/ink"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <!--
+            The reversed logo, because this screen sits on Ink and the supplied artwork is a
+            near-Ink wordmark that would disappear on it. Capped rather than fixed so it still
+            fits a narrow phone.
+        -->
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:adjustViewBounds="true"
+            android:contentDescription="@string/logo_description"
+            android:maxWidth="260dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/logo_siloam_one" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:letterSpacing="0.14"
+            android:text="@string/app_name"
+            android:textAllCaps="true"
+            android:textColor="@color/on_ink_muted"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            style="@style/Card"
+            android:layout_marginTop="28dp"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/login_title"
+                android:textColor="@color/text_primary"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/site"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textColor="@color/accent_text"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/login_subtitle"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+
+            <EditText
+                android:id="@+id/username"
+                style="@style/Input"
+                android:layout_marginTop="20dp"
+                android:autofillHints="username"
+                android:hint="@string/login_username"
+                android:imeOptions="actionNext"
+                android:inputType="textNoSuggestions|textVisiblePassword"
+                android:singleLine="true" />
+
+            <EditText
+                android:id="@+id/password"
+                style="@style/Input"
+                android:layout_marginTop="12dp"
+                android:autofillHints="password"
+                android:hint="@string/login_password"
+                android:imeOptions="actionDone"
+                android:inputType="textPassword"
+                android:singleLine="true" />
+
+            <TextView
+                android:id="@+id/error"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:textColor="@color/error"
+                android:textSize="14sp"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/sign_in"
+                style="@style/PrimaryButton"
+                android:layout_marginTop="20dp"
+                android:text="@string/login_button" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/version"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:textColor="@color/on_ink_faint"
+            android:textSize="12sp" />
+    </LinearLayout>
+</ScrollView>
