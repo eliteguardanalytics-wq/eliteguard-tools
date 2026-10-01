@@ -55,7 +55,8 @@ everything was scanned.
   for administrators. Tours leads to the tour picker, or straight back into an unfinished tour.
   Incident Report and Post Orders are on the screen because an officer will look for them, but
   nothing is built behind them yet: both carry a "Coming soon" badge and say so when tapped,
-  which is better than a tile that looks live and silently does nothing.
+  which is better than a tile that looks live and silently does nothing. The tiles are titles
+  only — an officer knows what they are without a line of description under each.
 - **Tour picker**: every tour, grouped under its site, with its checkpoint count.
 - **Tour screen**: the tour's checkpoint names. A tag tap matches the name written on the tag
   against this tour's checkpoints; a match turns green, shows the time, and moves to the bottom.
@@ -439,5 +440,8 @@ red-green colourblind officer.
   `tour_log_summary` view and `tour_scans` table are ready.
 - **`app-config.json` on each tenant host**, once a second tenant exists, so a single build can
   serve all of them.
+- **Incident Report**: fold the existing browser-based incident system into the app, behind the
+  tile that is already there.
+- **Post Orders**: uploaded per site through the admin portal, read in the app from that tile.
 - Optional GPS capture per scan and photo/incident notes at a checkpoint.
 - Scheduled tour compliance reporting (expected vs. actual tours per shift).

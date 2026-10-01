@@ -24,7 +24,6 @@ class HomeActivity : Activity() {
 
     private val app by lazy { App.get(this) }
     private lateinit var toursBox: View
-    private lateinit var toursSubtitle: TextView
     private lateinit var setupTags: Button
     private lateinit var syncStatus: TextView
     private lateinit var activeTourBanner: TextView
@@ -50,7 +49,6 @@ class HomeActivity : Activity() {
         message = findViewById(R.id.message)
         nfcBanner = findViewById(R.id.nfc_banner)
         toursBox = findViewById(R.id.box_tours)
-        toursSubtitle = findViewById(R.id.tours_subtitle)
         setupTags = findViewById(R.id.setup_tags)
 
         findViewById<TextView>(R.id.site_name).text = app.device.siteName
@@ -111,13 +109,12 @@ class HomeActivity : Activity() {
         Bg.run({ Triple(db.anyActiveLog(), db.pendingCount(), db.tours().size) }) { result ->
             result.onSuccess { (active, pending, tourCount) ->
                 activeTourId = active?.tourId
+                // The banner above already names an unfinished tour, so the tile stays a label.
                 if (active != null) {
                     activeTourBanner.text = getString(R.string.home_active_tour, active.propertyName, active.tourName)
                     activeTourBanner.visibility = View.VISIBLE
-                    toursSubtitle.text = getString(R.string.home_tours_resume, active.tourName)
                 } else {
                     activeTourBanner.visibility = View.GONE
-                    toursSubtitle.setText(if (tourCount > 0) R.string.home_tours_sub else R.string.home_tours_none)
                 }
                 toursBox.isEnabled = tourCount > 0 || active != null
                 toursBox.alpha = if (toursBox.isEnabled) 1f else 0.55f

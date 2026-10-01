@@ -13,8 +13,8 @@ android {
         applicationId = "com.eliteguard.checkpoint"
         minSdk = 26
         targetSdk = 36
-        versionCode = 9
-        versionName = "3.2.0"
+        versionCode = 10
+        versionName = "3.2.1"
     }
 
     buildTypes {
