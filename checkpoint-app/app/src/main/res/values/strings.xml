@@ -32,9 +32,17 @@
 
     <!-- Home -->
     <string name="home_title">Elite Guard Tours</string>
-    <string name="home_start_tour">Start Tour</string>
-    <string name="home_resume_tour">Resume Tour</string>
     <string name="home_setup_tags">Set Up Tags</string>
+    <string name="home_tours">Tours</string>
+    <string name="home_tours_sub">Walk a patrol route</string>
+    <string name="home_tours_resume">Resume %1$s</string>
+    <string name="home_tours_none">No tours set up for this site yet</string>
+    <string name="home_incident">Incident Report</string>
+    <string name="home_incident_sub">Report something that happened</string>
+    <string name="home_post_orders">Post Orders</string>
+    <string name="home_post_orders_sub">Standing instructions for this site</string>
+    <string name="home_coming_soon">Coming soon</string>
+    <string name="home_not_built">%1$s is not built yet.</string>
     <string name="home_greeting">Signed in as %1$s</string>
     <string name="home_admin">Administrator</string>
     <string name="home_active_tour">%1$s · %2$s in progress</string>

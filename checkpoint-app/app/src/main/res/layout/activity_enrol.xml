@@ -5,10 +5,13 @@
     android:background="@color/ink" android:fillViewport="true">
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:gravity="center" android:orientation="vertical" android:padding="24dp">
-        <ImageView android:layout_width="84dp" android:layout_height="84dp"
-            android:contentDescription="@string/app_name" android:src="@drawable/ic_launcher_foreground" />
+        <ImageView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:adjustViewBounds="true" android:maxWidth="240dp" android:scaleType="fitCenter"
+            android:contentDescription="@string/logo_description" android:src="@drawable/logo_siloam_one" />
         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="@string/app_name" android:textColor="@color/on_ink" android:textSize="24sp" android:textStyle="bold" />
+            android:layout_marginTop="10dp" android:letterSpacing="0.14" android:text="@string/app_name"
+            android:textAllCaps="true" android:textColor="@color/on_ink_muted" android:textSize="12sp"
+            android:textStyle="bold" />
         <LinearLayout style="@style/Card" android:layout_marginTop="24dp" android:orientation="vertical" android:padding="20dp">
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:text="@string/enrol_title" android:textColor="@color/text_primary" android:textSize="20sp" android:textStyle="bold" />

@@ -51,8 +51,11 @@ everything was scanned.
 ## What the app does
 
 - **Sign in** with the same username and password as the incident reporting portal.
-- **Home**: one big **Start Tour** button, plus **Set Up Tags** for administrators. An unfinished
-  tour turns the button into **Resume Tour**.
+- **Home**: three tiles — **Tours**, **Incident Report**, **Post Orders** — plus **Set Up Tags**
+  for administrators. Tours leads to the tour picker, or straight back into an unfinished tour.
+  Incident Report and Post Orders are on the screen because an officer will look for them, but
+  nothing is built behind them yet: both carry a "Coming soon" badge and say so when tapped,
+  which is better than a tile that looks live and silently does nothing.
 - **Tour picker**: every tour, grouped under its site, with its checkpoint count.
 - **Tour screen**: the tour's checkpoint names. A tag tap matches the name written on the tag
   against this tour's checkpoints; a match turns green, shows the time, and moves to the bottom.
@@ -198,9 +201,20 @@ checkpoint-app/
   app/src/main/res/             layouts, strings, colours, icons
 ```
 
+## Launcher icon
+
+The Siloam One emblem on a Bone tile, as an adaptive icon: `mipmap-*/ic_launcher_foreground.png`
+over `@color/ic_launcher_background`. The tile is light rather than Ink because the rings inside
+the emblem are transparent, not white, so whatever is behind shows through them; on Ink the slate
+would nearly disappear.
+
+The emblem is scaled to 66 of the 108dp canvas and centred. That is the circle an adaptive icon
+guarantees to keep whatever mask a launcher applies, so the mark survives a circle, a squircle or
+a rounded square without clipping.
+
 ## Logo
 
-The Siloam One mark on the login screen is `res/drawable-*/logo_siloam_one.png`, at five
+The Siloam One mark on the login and activation screens is `res/drawable-*/logo_siloam_one.png`, at five
 densities. It is a **reversed** version of the supplied artwork: that file is a near-Ink wordmark
 on transparency, which would be invisible on the Ink login background, so it was recoloured by
 inverting lightness — the wordmark becomes Bone, the emblem separators become the darkest parts,

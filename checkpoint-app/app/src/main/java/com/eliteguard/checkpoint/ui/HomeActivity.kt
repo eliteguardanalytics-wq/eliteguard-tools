@@ -23,7 +23,8 @@ import com.eliteguard.checkpoint.util.Bg
 class HomeActivity : Activity() {
 
     private val app by lazy { App.get(this) }
-    private lateinit var startTour: Button
+    private lateinit var toursBox: View
+    private lateinit var toursSubtitle: TextView
     private lateinit var setupTags: Button
     private lateinit var syncStatus: TextView
     private lateinit var activeTourBanner: TextView
@@ -48,17 +49,26 @@ class HomeActivity : Activity() {
         activeTourBanner = findViewById(R.id.active_tour_banner)
         message = findViewById(R.id.message)
         nfcBanner = findViewById(R.id.nfc_banner)
-        startTour = findViewById(R.id.start_tour)
+        toursBox = findViewById(R.id.box_tours)
+        toursSubtitle = findViewById(R.id.tours_subtitle)
         setupTags = findViewById(R.id.setup_tags)
 
         findViewById<TextView>(R.id.site_name).text = app.device.siteName
-        startTour.setOnClickListener {
+        toursBox.setOnClickListener {
             val running = activeTourId
             if (running != null) {
                 startActivity(TourActivity.intent(this, running))
             } else {
                 startActivity(TourPickerActivity.intent(this, TourPickerActivity.Mode.RUN))
             }
+        }
+        // On the screen because the officer will expect them, but nothing behind them yet. Saying
+        // so out loud beats a tile that looks live and does nothing.
+        findViewById<View>(R.id.box_incident).setOnClickListener {
+            toast(getString(R.string.home_not_built, getString(R.string.home_incident)), long = true)
+        }
+        findViewById<View>(R.id.box_post_orders).setOnClickListener {
+            toast(getString(R.string.home_not_built, getString(R.string.home_post_orders)), long = true)
         }
         setupTags.setOnClickListener { startActivity(Intent(this, SetupMenuActivity::class.java)) }
         setupTags.visibility = if (app.session.canManageCheckpoints) View.VISIBLE else View.GONE
@@ -104,12 +114,13 @@ class HomeActivity : Activity() {
                 if (active != null) {
                     activeTourBanner.text = getString(R.string.home_active_tour, active.propertyName, active.tourName)
                     activeTourBanner.visibility = View.VISIBLE
-                    startTour.text = getString(R.string.home_resume_tour)
+                    toursSubtitle.text = getString(R.string.home_tours_resume, active.tourName)
                 } else {
                     activeTourBanner.visibility = View.GONE
-                    startTour.text = getString(R.string.home_start_tour)
+                    toursSubtitle.setText(if (tourCount > 0) R.string.home_tours_sub else R.string.home_tours_none)
                 }
-                startTour.isEnabled = tourCount > 0 || active != null
+                toursBox.isEnabled = tourCount > 0 || active != null
+                toursBox.alpha = if (toursBox.isEnabled) 1f else 0.55f
                 syncStatus.text = if (pending > 0) getString(R.string.home_pending_sync, pending) else getString(R.string.home_all_synced)
                 if (!refreshing && tourCount == 0) {
                     message.text = getString(R.string.home_no_tours)

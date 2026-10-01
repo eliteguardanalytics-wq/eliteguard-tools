@@ -83,5 +83,6 @@
     <color name="button_danger">@color/error</color>
     <color name="button_danger_pressed">#7E2A20</color>
 
-    <color name="ic_launcher_background">@color/ink</color>
+    <!-- Light, because the emblem rings are transparent and read against the tile. -->
+    <color name="ic_launcher_background">@color/bone</color>
 </resources>

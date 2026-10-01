@@ -47,5 +47,5 @@ object Config {
     /** Columns searched, in order, for the officer's login name. */
     val USERNAME_COLUMNS = listOf("username", "email", "display_name", "full_name", "name")
 
-    const val VERSION_NAME = "3.1.0"
+    const val VERSION_NAME = "3.2.0"
 }
